@@ -7,12 +7,12 @@ import PaymentModal from './PaymentModal';
 export default function MoverSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { profile, signOut } = useAuth(); // Get profile and signOut function
+  const { profile, signOut } = useAuth();
   const [showPayment, setShowPayment] = useState(false);
 
   const handleLogout = async () => {
     await signOut();
-    navigate('/'); // Redirect to home after logout
+    navigate('/'); 
   };
 
   const linkClass = (path) => 
@@ -80,15 +80,11 @@ export default function MoverSidebar() {
         </div>
       </aside>
 
-      {/* Payment Modal triggered from Sidebar */}
+      {/* Payment Modal */}
       <PaymentModal 
         isOpen={showPayment} 
         onClose={() => setShowPayment(false)} 
-        onSuccess={() => {
-            // In a real app, you'd refresh the profile here
-            alert("Payment Successful! Your profile is now active.");
-            window.location.reload(); 
-        }}
+        onSuccess={() => window.location.reload()} 
         type="mover" 
       />
     </>

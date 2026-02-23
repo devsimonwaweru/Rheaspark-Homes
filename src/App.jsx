@@ -1,5 +1,6 @@
 import React from 'react'
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+// Using HashRouter for GitHub Pages compatibility (prevents 404 on refresh)
+import { HashRouter as Router, Routes, Route } from 'react-router-dom'
 
 // Components
 import Header from './components/Header'
@@ -19,6 +20,9 @@ import MoversPage from './pages/MoversPage'
 // Auth Pages
 import LandlordAuth from './pages/LandlordAuth'
 import MoverAuth from './pages/MoverAuth'
+
+// Activation Page (Payment)
+import MoverActivation from './pages/MoverActivation'
 
 // Landlord Dashboard
 import LandlordDashboard from './pages/LandlordDashboard'
@@ -44,6 +48,12 @@ function App() {
             <Route path="/mover-login" element={<MoverAuth />} />
 
             {/* ========================================== */}
+            {/* ACTIVATION ROUTE (Payment Gateway) */}
+            {/* ========================================== */}
+            {/* Users are sent here if they are logged in but haven't paid */}
+            <Route path="/activate-mover" element={<MoverActivation />} />
+
+            {/* ========================================== */}
             {/* LANDLORD PROTECTED ROUTES */}
             {/* ========================================== */}
             <Route path="/landlord/*" element={
@@ -53,7 +63,6 @@ function App() {
             }>
               <Route index element={<LandlordHome />} />
               <Route path="add-property" element={<AddProperty />} />
-              {/* Add more landlord routes here if needed */}
             </Route>
 
             {/* ========================================== */}

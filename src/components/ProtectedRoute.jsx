@@ -9,25 +9,24 @@ export default function ProtectedRoute({ children, allowedRoles }) {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
   }
 
-  // 1. If no profile (not logged in), redirect to login
+  // 1. If not logged in, go to login
   if (!profile) {
     if (allowedRoles.includes('mover')) return <Navigate to="/mover-login" />;
     if (allowedRoles.includes('landlord')) return <Navigate to="/landlord-login" />;
     return <Navigate to="/" />;
   }
 
-  // 2. If role is not allowed, redirect to their correct place
+  // 2. If wrong role, go to correct dashboard
   if (!allowedRoles.includes(profile.role)) {
     if (profile.role === 'landlord') return <Navigate to="/landlord" />;
     if (profile.role === 'mover') return <Navigate to="/mover" />;
     return <Navigate to="/" />;
   }
 
-  // 3. NEW: If role is Landlord or Mover, check Subscription Status
-  // If they are not subscribed, send them back to login to pay
+  // 3. CRITICAL FIX: If correct role but NOT subscribed -> Go to ACTIVATION
   if ((profile.role === 'landlord' || profile.role === 'mover') && !profile.is_subscribed) {
-    if (profile.role === 'landlord') return <Navigate to="/landlord-login" />;
-    if (profile.role === 'mover') return <Navigate to="/mover-login" />;
+    if (profile.role === 'landlord') return <Navigate to="/activate-landlord" />;
+    if (profile.role === 'mover') return <Navigate to="/activate-mover" />;
   }
 
   return children;

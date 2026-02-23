@@ -1,4 +1,3 @@
-/* eslint-disable react-hooks/exhaustive-deps */
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabaseClient';
@@ -9,14 +8,12 @@ export default function MoverHome() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchMoverData();
+    if (user) fetchMoverData();
   }, [fetchMoverData, user]);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const fetchMoverData = async () => {
-    if (!user) return;
-
     try {
-      // Fetch specific mover details from 'movers' table
       const { data, error } = await supabase
         .from('movers')
         .select('*')
@@ -32,7 +29,7 @@ export default function MoverHome() {
     }
   };
 
-  if (loading) return <div className="text-center py-10">Loading Dashboard...</div>;
+  if (loading) return <div className="text-center py-10 text-gray-500">Loading Dashboard...</div>;
 
   return (
     <div>
@@ -47,7 +44,8 @@ export default function MoverHome() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+        
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-500">Total Jobs</p>
@@ -59,7 +57,7 @@ export default function MoverHome() {
           </div>
         </div>
         
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-500">Rating</p>
@@ -74,7 +72,7 @@ export default function MoverHome() {
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-500">Verification</p>
@@ -89,17 +87,17 @@ export default function MoverHome() {
         </div>
       </div>
 
-      {/* Recent Job Requests (Placeholder) */}
+      {/* Recent Job Requests */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="p-6 border-b border-gray-100 flex justify-between items-center">
           <h3 className="font-bold text-gray-800">Recent Job Requests</h3>
-          <a href="#" className="text-sm text-primary-green font-semibold hover:underline">View All</a>
+          <Link to="/mover/jobs" className="text-sm text-primary-green font-semibold hover:underline">View All</Link>
         </div>
         
-        <div className="p-6 text-center text-gray-500">
-          <i className="fas fa-inbox text-4xl mb-3 text-gray-300"></i>
-          <p>No new job requests at the moment.</p>
-          <p className="text-sm">Ensure your subscription is active to receive requests.</p>
+        <div className="p-10 text-center text-gray-500">
+          <i className="fas fa-inbox text-5xl mb-4 text-gray-300"></i>
+          <p className="font-medium">No new job requests</p>
+          <p className="text-sm mt-1">Ensure your subscription is active to receive requests.</p>
         </div>
       </div>
     </div>

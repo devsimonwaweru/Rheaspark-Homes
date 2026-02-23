@@ -1,7 +1,8 @@
+// src/context/AuthContext.jsx
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 
-const AuthContext = createContext({});
+const AuthContext = createContext();
 
 // eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => useContext(AuthContext);
@@ -11,7 +12,9 @@ export const AuthProvider = ({ children }) => {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Function to fetch user profile from 'profiles' table
+  // ---------------------------
+  // Fetch Profile
+  // ---------------------------
   const fetchProfile = async (userId) => {
     try {
       const { data, error } = await supabase
@@ -21,66 +24,109 @@ export const AuthProvider = ({ children }) => {
         .single();
 
       if (error) {
-        console.error('Error fetching profile:', error);
-        return null;
+        console.error('Profile fetch error:', error.message);
+        setProfile(null);
+        return;
       }
-      return data;
-    } catch (error) {
-      console.error('Error fetching profile:', error);
-      return null;
+
+      setProfile(data);
+    } catch (err) {
+      console.error('Unexpected profile error:', err.message);
+      setProfile(null);
     }
   };
 
+  // ---------------------------
+  // Session Handling
+  // ---------------------------
   useEffect(() => {
-    // 1. Check for active session on initial load
-    const checkSession = async () => {
+    const initSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      setUser(session?.user ?? null);
-      
+
       if (session?.user) {
-        const profileData = await fetchProfile(session.user.id);
-        setProfile(profileData);
+        setUser(session.user);
+        await fetchProfile(session.user.id);
       }
-      
+
       setLoading(false);
     };
 
-    checkSession();
+    initSession();
 
-    // 2. Listen for authentication changes (Login, Logout, Token Refresh)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        setUser(session?.user ?? null);
-        
+    const { data: { subscription } } =
+      supabase.auth.onAuthStateChange(async (_event, session) => {
         if (session?.user) {
-          const profileData = await fetchProfile(session.user.id);
-          setProfile(profileData);
+          setUser(session.user);
+          await fetchProfile(session.user.id);
         } else {
+          setUser(null);
           setProfile(null);
         }
-        
-        setLoading(false);
-      }
-    );
 
-    // Cleanup subscription on unmount
-    return () => {
-      subscription.unsubscribe();
-    };
+        setLoading(false);
+      });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  // Authentication Methods
-  const signUp = (data) => supabase.auth.signUp(data);
-  const signIn = (data) => supabase.auth.signInWithPassword(data);
-  const signOut = () => supabase.auth.signOut();
+  // ---------------------------
+  // Sign Up (Improved)
+  // ---------------------------
+  const signUp = async ({ email, password, options }) => {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options
+    });
+
+    if (error) {
+      // Handle duplicate email cleanly
+      if (error.status === 422) {
+        return {
+          data: null,
+          error: {
+            code: 'USER_EXISTS',
+            message: 'User already registered'
+          }
+        };
+      }
+
+      return { data: null, error };
+    }
+
+    return { data, error: null };
+  };
+
+  // ---------------------------
+  // Sign In
+  // ---------------------------
+  const signIn = async ({ email, password }) => {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    });
+
+    if (error) {
+      return { data: null, error };
+    }
+
+    return { data, error: null };
+  };
+
+  // ---------------------------
+  // Refresh Profile
+  // ---------------------------
+  const refreshProfile = async () => {
+    if (user) await fetchProfile(user.id);
+  };
 
   const value = {
     signUp,
     signIn,
-    signOut,
-    user,      // Supabase Auth User Object
-    profile,   // Custom Profile Object (contains role, is_subscribed)
-    loading,   // Loading state
+    user,
+    profile,
+    loading,
+    refreshProfile
   };
 
   return (

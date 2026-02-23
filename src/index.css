@@ -39,7 +39,7 @@ body {
 .nav-link {
   position: relative;
   padding: 8px 0;
-  color: #333;
+ 
   font-weight: 500;
   transition: all 0.3s ease;
 }
