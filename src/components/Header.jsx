@@ -43,7 +43,6 @@ export default function Header() {
             {/* Desktop Navigation */}
             <nav className="hidden lg:flex items-center space-x-10">
               
-              {/* UPDATED: Added text-white and hover effect */}
               <Link to="/" className="nav-link text-white hover:text-blue-200">Home</Link>
 
               {/* Find a House Dropdown */}
@@ -97,24 +96,22 @@ export default function Header() {
 
             </nav>
 
-            {/* Desktop CTA Buttons */}
+            {/* Desktop Dashboard Buttons */}
             <div className="hidden lg:flex items-center space-x-6">
-              
-              {/* Login Dropdown */}
               <div className="dropdown-container relative">
-                <span className="nav-link cursor-pointer text-white hover:text-blue-200">Log In</span>
+                <span className="nav-link cursor-pointer text-white hover:text-blue-200">Dashboards</span>
                 <div className="dropdown-menu absolute top-full right-0 w-56 bg-white rounded-xl shadow-xl border border-gray-100 p-2">
-                  <Link to="/login" className="block px-4 py-3 rounded-lg hover:bg-blue-50 transition-colors">
-                    <div className="font-medium text-gray-800">Tenant / User</div>
-                    <div className="text-sm text-gray-500">Access your searches</div>
-                  </Link>
-                  <Link to="/landlord-login" className="block px-4 py-3 rounded-lg hover:bg-green-50 transition-colors">
-                    <div className="font-medium text-gray-800">Landlord</div>
+                  <Link to="/landlord" className="block px-4 py-3 rounded-lg hover:bg-green-50 transition-colors">
+                    <div className="font-medium text-gray-800">Landlord Dashboard</div>
                     <div className="text-sm text-gray-500">Manage your listings</div>
                   </Link>
-                  <Link to="/mover-login" className="block px-4 py-3 rounded-lg hover:bg-blue-50 transition-colors">
-                    <div className="font-medium text-gray-800">Service Provider</div>
+                  <Link to="/mover" className="block px-4 py-3 rounded-lg hover:bg-blue-50 transition-colors">
+                    <div className="font-medium text-gray-800">Mover Dashboard</div>
                     <div className="text-sm text-gray-500">Manage moving jobs</div>
+                  </Link>
+                  <Link to="/admin" className="block px-4 py-3 rounded-lg hover:bg-gray-50 transition-colors">
+                    <div className="font-medium text-gray-800">Admin Dashboard</div>
+                    <div className="text-sm text-gray-500">Manage users & system</div>
                   </Link>
                 </div>
               </div>
@@ -195,17 +192,17 @@ export default function Header() {
               )}
             </div>
 
-            {/* Mobile Dropdown: Log In */}
+            {/* Mobile Dropdown: Dashboards */}
             <div className="border-b border-blue-800">
-              <button onClick={() => handleDropdown('login')} className="w-full flex justify-between items-center py-3 text-white font-medium">
-                Log In
-                <span className="text-blue-300">{openDropdown === 'login' ? '-' : '+'}</span>
+              <button onClick={() => handleDropdown('dashboard')} className="w-full flex justify-between items-center py-3 text-white font-medium">
+                Dashboards
+                <span className="text-blue-300">{openDropdown === 'dashboard' ? '-' : '+'}</span>
               </button>
-              {openDropdown === 'login' && (
+              {openDropdown === 'dashboard' && (
                 <div className="pl-4 pb-3 space-y-2">
-                  <Link to="/login" onClick={toggleMobileMenu} className="block py-2 text-blue-200">Tenant / User</Link>
-                  <Link to="/landlord-login" onClick={toggleMobileMenu} className="block py-2 text-blue-200">Landlord Portal</Link>
-                  <Link to="/mover-login" onClick={toggleMobileMenu} className="block py-2 text-blue-200">Mover Portal</Link>
+                  <Link to="/landlord" onClick={toggleMobileMenu} className="block py-2 text-blue-200">Landlord Dashboard</Link>
+                  <Link to="/mover" onClick={toggleMobileMenu} className="block py-2 text-blue-200">Mover Dashboard</Link>
+                  <Link to="/admin" onClick={toggleMobileMenu} className="block py-2 text-blue-200">Admin Dashboard</Link>
                 </div>
               )}
             </div>

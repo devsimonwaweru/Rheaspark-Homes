@@ -1,87 +1,73 @@
-import React from 'react'
-// Using HashRouter for GitHub Pages compatibility (prevents 404 on refresh)
-import { HashRouter as Router, Routes, Route } from 'react-router-dom'
+import React from 'react';
+// Using HashRouter for GitHub Pages compatibility
+import { HashRouter as Router, Routes, Route } from 'react-router-dom';
 
 // Components
-import Header from './components/Header'
-import Footer from './components/Footer'
-import WhatsAppButton from './components/WhatsAppButton'
-import ProtectedRoute from './components/ProtectedRoute'
-
-// Context
-import { AuthProvider } from './context/AuthContext'
+import Header from './components/Header';
+import Footer from './components/Footer';
+import WhatsAppButton from './components/WhatsAppButton';
 
 // Public Pages
-import Home from './pages/Home'
-import FindHouses from './pages/FindHouses'
-import Payment from './pages/Payment'
-import MoversPage from './pages/MoversPage'
-
-// Auth Pages
-import LandlordAuth from './pages/LandlordAuth'
-import MoverAuth from './pages/MoverAuth'
-
-// Activation Page (Payment)
-import MoverActivation from './pages/MoverActivation'
+import Home from './pages/Home';
+import FindHouses from './pages/FindHouses';
+import Payment from './pages/Payment';
+import MoversPage from './pages/MoversPage';
 
 // Landlord Dashboard
-import LandlordDashboard from './pages/LandlordDashboard'
-import LandlordHome from './pages/LandlordHome'
-import AddProperty from './pages/AddProperty'
+import LandlordDashboard from './pages/LandlordDashboard';
+import LandlordHome from './pages/LandlordHome';
+import AddProperty from './pages/AddProperty';
 
 // Mover Dashboard
-import MoverDashboard from './pages/MoverDashboard'
-import MoverHome from './pages/MoverHome'
-import MoverJobs from './pages/MoverJobs'
+import MoverDashboard from './pages/MoverDashboard';
+import MoverHome from './pages/MoverHome';
+import MoverJobs from './pages/MoverJobs';
+
+// Admin Dashboard
+import AdminLayout from './pages/AdminLayout';
+import AdminDashboard from './pages/AdminDashboard';
+import AdminMovers from './pages/AdminMovers';
+import AdminLandlords from './pages/AdminLandlords';
 
 function App() {
   return (
     <Router>
-      <AuthProvider>
-        <div className="flex flex-col min-h-screen">
-          <Routes>
-            
-            {/* ========================================== */}
-            {/* AUTH ROUTES (No Header/Footer) */}
-            {/* ========================================== */}
-            <Route path="/landlord-login" element={<LandlordAuth />} />
-            <Route path="/mover-login" element={<MoverAuth />} />
+      <div className="flex flex-col min-h-screen">
+        <Routes>
+          {/* ========================================== */}
+          {/* ADMIN ROUTES */}
+          {/* ========================================== */}
+          <Route path="/admin/*" element={<AdminLayout />}>
+            {/* Dashboard */}
+            <Route index element={<AdminDashboard />} />
+            {/* Users Management */}
+            <Route path="movers" element={<AdminMovers />} />
+            <Route path="landlords" element={<AdminLandlords />} />
+          </Route>
 
-            {/* ========================================== */}
-            {/* ACTIVATION ROUTE (Payment Gateway) */}
-            {/* ========================================== */}
-            {/* Users are sent here if they are logged in but haven't paid */}
-            <Route path="/activate-mover" element={<MoverActivation />} />
+          {/* ========================================== */}
+          {/* LANDLORD PROTECTED ROUTES */}
+          {/* ========================================== */}
+          <Route path="/landlord/*" element={<LandlordDashboard />}>
+            <Route index element={<LandlordHome />} />
+            <Route path="add-property" element={<AddProperty />} />
+          </Route>
 
-            {/* ========================================== */}
-            {/* LANDLORD PROTECTED ROUTES */}
-            {/* ========================================== */}
-            <Route path="/landlord/*" element={
-              <ProtectedRoute allowedRoles={['landlord']}>
-                <LandlordDashboard />
-              </ProtectedRoute>
-            }>
-              <Route index element={<LandlordHome />} />
-              <Route path="add-property" element={<AddProperty />} />
-            </Route>
+          {/* ========================================== */}
+          {/* MOVER PROTECTED ROUTES */}
+          {/* ========================================== */}
+          <Route path="/mover/*" element={<MoverDashboard />}>
+            <Route index element={<MoverHome />} />
+            <Route path="jobs" element={<MoverJobs />} />
+            <Route path="profile" element={<MoverHome />} />
+          </Route>
 
-            {/* ========================================== */}
-            {/* MOVER PROTECTED ROUTES */}
-            {/* ========================================== */}
-            <Route path="/mover/*" element={
-              <ProtectedRoute allowedRoles={['mover']}>
-                <MoverDashboard />
-              </ProtectedRoute>
-            }>
-              <Route index element={<MoverHome />} />
-              <Route path="jobs" element={<MoverJobs />} />
-              <Route path="profile" element={<MoverHome />} />
-            </Route>
-
-            {/* ========================================== */}
-            {/* PUBLIC ROUTES (With Header/Footer) */}
-            {/* ========================================== */}
-            <Route path="*" element={
+          {/* ========================================== */}
+          {/* PUBLIC ROUTES (With Header/Footer) */}
+          {/* ========================================== */}
+          <Route
+            path="*"
+            element={
               <>
                 <Header />
                 <main className="flex-grow">
@@ -90,21 +76,19 @@ function App() {
                     <Route path="/find-houses" element={<FindHouses />} />
                     <Route path="/payment" element={<Payment />} />
                     <Route path="/movers" element={<MoversPage />} />
-                    
-                    {/* Fallback for unknown routes */}
+                    {/* Fallback */}
                     <Route path="*" element={<Home />} />
                   </Routes>
                 </main>
                 <Footer />
                 <WhatsAppButton />
               </>
-            } />
-
-          </Routes>
-        </div>
-      </AuthProvider>
+            }
+          />
+        </Routes>
+      </div>
     </Router>
-  )
+  );
 }
 
-export default App
+export default App;

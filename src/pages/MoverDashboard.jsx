@@ -6,7 +6,9 @@ export default function MoverDashboard() {
   return (
     <div className="bg-gray-50 min-h-screen">
       <MoverSidebar />
-      <div className="md:ml-64 p-8">
+      
+      {/* Main Content Area - pushes right on desktop */}
+      <div className="md:ml-64 p-8 transition-all duration-300">
         <Outlet /> 
       </div>
     </div>
