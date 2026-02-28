@@ -1,6 +1,5 @@
 import React from 'react';
-// Using HashRouter for GitHub Pages compatibility
-import { HashRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 
 // Components
 import Header from './components/Header';
@@ -10,7 +9,7 @@ import WhatsAppButton from './components/WhatsAppButton';
 // Public Pages
 import Home from './pages/Home';
 import FindHouses from './pages/FindHouses';
-import Payment from './pages/Payment';
+import Payment from './pages/PaymentPage';
 import MoversPage from './pages/MoversPage';
 
 // Landlord Dashboard
@@ -33,20 +32,20 @@ function App() {
   return (
     <Router>
       <div className="flex flex-col min-h-screen">
+
         <Routes>
+
           {/* ========================================== */}
           {/* ADMIN ROUTES */}
           {/* ========================================== */}
           <Route path="/admin/*" element={<AdminLayout />}>
-            {/* Dashboard */}
             <Route index element={<AdminDashboard />} />
-            {/* Users Management */}
             <Route path="movers" element={<AdminMovers />} />
             <Route path="landlords" element={<AdminLandlords />} />
           </Route>
 
           {/* ========================================== */}
-          {/* LANDLORD PROTECTED ROUTES */}
+          {/* LANDLORD ROUTES */}
           {/* ========================================== */}
           <Route path="/landlord/*" element={<LandlordDashboard />}>
             <Route index element={<LandlordHome />} />
@@ -54,7 +53,7 @@ function App() {
           </Route>
 
           {/* ========================================== */}
-          {/* MOVER PROTECTED ROUTES */}
+          {/* MOVER ROUTES */}
           {/* ========================================== */}
           <Route path="/mover/*" element={<MoverDashboard />}>
             <Route index element={<MoverHome />} />
@@ -76,7 +75,8 @@ function App() {
                     <Route path="/find-houses" element={<FindHouses />} />
                     <Route path="/payment" element={<Payment />} />
                     <Route path="/movers" element={<MoversPage />} />
-                    {/* Fallback */}
+                    
+                    {/* Fallback for unmatched public routes */}
                     <Route path="*" element={<Home />} />
                   </Routes>
                 </main>
@@ -85,7 +85,9 @@ function App() {
               </>
             }
           />
+
         </Routes>
+
       </div>
     </Router>
   );

@@ -1,70 +1,123 @@
-import React, { useState } from 'react';
-import FilterPanel from '../components/FilterPanel';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabaseClient';
 import PropertyCard from '../components/PropertyCard';
 import PropertyDetailsModal from '../components/PropertyDetailsModal';
+import FilterPanel from '../components/FilterPanel';
 
 export default function FindHouses() {
-  // State for Modal
+  const [properties, setProperties] = useState([]);
   const [selectedProperty, setSelectedProperty] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  // Dummy Data
-  const allProperties = [
-    { id: 1, type: "Apartment", image: "https://images.unsplash.com/photo-1560518883-ce09059eeffa?ixlib=rb-4.0.3&auto=format&fit=crop&w=1073&q=80", title: "Spacious 3-Bedroom Apartment", location: "Westlands, Nairobi", price: 85000, beds: 3, baths: 2, size: 1200, verified: true },
-    { id: 2, type: "House", image: "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?ixlib=rb-4.0.3&auto=format&fit=crop&w=1170&q=80", title: "Contemporary Family Home", location: "Kileleshwa, Nairobi", price: 120000, beds: 4, baths: 3, size: 2400, verified: true },
-    { id: 3, type: "Apartment", image: "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?ixlib=rb-4.0.3&auto=format&fit=crop&w=1170&q=80", title: "Luxury 2-Bedroom Suite", location: "Kilimani, Nairobi", price: 65000, beds: 2, baths: 2, size: 950, verified: true },
-    { id: 4, type: "Studio", image: "https://images.unsplash.com/photo-1600607687644-c7171b42498b?ixlib=rb-4.0.3&auto=format&fit=crop&w=1170&q=80", title: "Cozy Studio", location: "Lavington, Nairobi", price: 35000, beds: 1, baths: 1, size: 450, isNew: true },
-    { id: 5, type: "Bedsitter", image: "https://images.unsplash.com/photo-1600566752355-35792bedcfea?ixlib=rb-4.0.3&auto=format&fit=crop&w=1170&q=80", title: "Modern Bedsitter", location: "South B, Nairobi", price: 25000, beds: 1, baths: 1, size: 300, verified: true },
-    { id: 6, type: "House", image: "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?ixlib=rb-4.0.3&auto=format&fit=crop&w=1153&q=80", title: "Executive Villa", location: "Runda, Nairobi", price: 180000, beds: 5, baths: 4, size: 4200, verified: true },
-  ];
+  // Robust mapping logic to handle Postgres array strings
+  const mapProperties = (data) => {
+    return data.map(p => {
+      let amenities = p.amenities || [];
+      
+      // Fix for Postgres string array format (e.g. "{Water,Electricity}")
+      if (typeof p.amenities === 'string') {
+        let cleanString = p.amenities;
+        if (cleanString.startsWith('{') && cleanString.endsWith('}')) {
+            cleanString = cleanString.slice(1, -1);
+        }
+        amenities = cleanString.split(',').filter(Boolean);
+      }
 
-  const [displayedProperties] = useState(allProperties);
+      return {
+        ...p,
+        image: p.images?.length ? p.images[0] : p.image_url || 'https://via.placeholder.com/400x300?text=No+Image',
+        amenities: amenities
+      };
+    });
+  };
 
-  // Handler to open modal
+  useEffect(() => {
+    // Initial Fetch
+    const fetchProperties = async () => {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('properties')
+        .select('*')
+        .eq('status', 'active')
+        .order('created_at', { ascending: false });
+      
+      if (!error && data) setProperties(mapProperties(data));
+      setLoading(false);
+    };
+
+    fetchProperties();
+
+    // Realtime Subscription
+    const channel = supabase
+      .channel('public:properties')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'properties' },
+        (payload) => {
+          // Only add if active
+          if (payload.new.status === 'active') {
+            const newProperty = mapProperties([payload.new])[0];
+            setProperties((prev) => [newProperty, ...prev]);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
   const handleViewDetails = (property) => {
     setSelectedProperty(property);
     setIsModalOpen(true);
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      
-      <div className="mb-10 text-center">
-        <h1 className="text-4xl md:text-5xl font-bold mb-4 font-brand">
-          Find Your <span className="brand-gradient">Perfect Home</span>
-        </h1>
-        <p className="text-gray-600 text-lg max-w-3xl mx-auto">
-          Browse verified rental listings with transparent information.
-        </p>
-      </div>
+    <div className="min-h-screen bg-gray-50">
+      <div className="container mx-auto px-4 py-8">
+        
+        {/* Header */}
+        <div className="mb-10 text-center">
+          <h1 className="text-4xl md:text-5xl font-bold mb-4 text-gray-800">
+            Find Your <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">Perfect Home</span>
+          </h1>
+          <p className="text-gray-500 text-lg">Browse verified listings.</p>
+        </div>
 
-      <FilterPanel onSearch={() => {}} onFilter={() => {}} />
+        <FilterPanel onSearch={() => {}} onFilter={() => {}} />
 
-      <div className="flex flex-col md:flex-row justify-between items-center mb-6">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-800">
-            <span className="text-primary-blue">{displayedProperties.length}</span> Properties Found
+        {/* Stats */}
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-xl font-bold text-gray-800">
+            <span className="text-blue-600">{properties.length}</span> Properties Available
           </h2>
         </div>
-      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-        {displayedProperties.map(property => (
-          <PropertyCard 
-            key={property.id} 
-            property={property} 
-            onViewDetails={handleViewDetails} 
+        {/* List */}
+        {loading ? (
+          <div className="text-center py-20 text-gray-400">Loading properties...</div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {properties.map(property => (
+              <PropertyCard 
+                key={property.id} 
+                property={property} 
+                onViewDetails={handleViewDetails} 
+              />
+            ))}
+          </div>
+        )}
+
+        {selectedProperty && (
+          <PropertyDetailsModal 
+            isOpen={isModalOpen} 
+            onClose={() => setIsModalOpen(false)} 
+            property={selectedProperty} 
           />
-        ))}
+        )}
       </div>
-
-      {/* The Payment/Details Modal */}
-      <PropertyDetailsModal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
-        property={selectedProperty} 
-      />
-
     </div>
   );
 }

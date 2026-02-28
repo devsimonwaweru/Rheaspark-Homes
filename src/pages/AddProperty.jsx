@@ -1,51 +1,44 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import GradientButton from '../components/GradientButton';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabaseClient';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+
+const POST_FEE = 35;
 
 export default function AddProperty() {
-  const navigate = useNavigate();
-  
-  // Form State
   const [formData, setFormData] = useState({
-    title: '', type: 'Apartment', location: '', price: '', description: ''
+    title: '', price: '', location: '', type: 'Single Room',
+    landlord_name: '', landlord_phone: ''
   });
-  
-  // State for multiple images
-  const [images, setImages] = useState([]);
   const [amenities, setAmenities] = useState([]);
+  const [imageFile, setImageFile] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [isPaid, setIsPaid] = useState(false);
+  
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
-  // Amenities List
-  const amenitiesList = [
-    "24/7 Security", "Water Supply", "WiFi Included", "Parking", "Gym", 
-    "Swimming Pool", "Balcony", "Pet Friendly", "CCTV", "Backup Generator"
+  const amenityOptions = [
+    'Water', 'Electricity', 'WiFi', 'Parking', 'Security', 
+    'Garbage Collection', 'Backup Generator', 'Furnished'
   ];
 
-  // Handle Input Change
+  useEffect(() => {
+    const paymentStatus = searchParams.get('payment');
+    const storedData = localStorage.getItem('pending_property_data');
+
+    if (paymentStatus === 'success' && storedData) {
+      setIsPaid(true);
+      const parsedData = JSON.parse(storedData);
+      setFormData(parsedData.formData);
+      setAmenities(parsedData.amenities || []);
+      localStorage.removeItem('pending_property_data');
+    }
+  }, [searchParams]);
+
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  // Handle Image Selection
-  const handleImageChange = (e) => {
-    const files = Array.from(e.target.files);
-    
-    // Create preview URLs for the selected files
-    const previewUrls = files.map(file => ({
-      file: file,
-      preview: URL.createObjectURL(file)
-    }));
-
-    setImages([...images, ...previewUrls]);
-  };
-
-  // Remove Image
-  const removeImage = (index) => {
-    const newImages = [...images];
-    newImages.splice(index, 1);
-    setImages(newImages);
-  };
-
-  // Handle Amenity Toggle
   const toggleAmenity = (amenity) => {
     if (amenities.includes(amenity)) {
       setAmenities(amenities.filter(a => a !== amenity));
@@ -54,149 +47,168 @@ export default function AddProperty() {
     }
   };
 
-  // Handle Form Submit
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    const propertyData = {
-      ...formData,
-      images: images.map(img => img.file), // Here you would normally upload files to server
-      amenities
-    };
 
-    console.log("Property Data:", propertyData);
-    
-    // Simulate success
-    alert("Property Submitted Successfully!");
-    navigate('/landlord');
+    if (!isPaid) {
+      localStorage.setItem('pending_property_data', JSON.stringify({ formData, amenities }));
+      navigate(`/payment?type=post_property&price=${POST_FEE}`);
+      return;
+    }
+
+    if (!imageFile) {
+        alert("Please select an image to finish publishing.");
+        return;
+    }
+
+    setLoading(true);
+    try {
+      // 1. Upload Image
+      const fileName = `prop-${Date.now()}-${imageFile.name.replace(/\s/g, '-')}`;
+      const { error: uploadError } = await supabase.storage
+        .from('property-images')
+        .upload(fileName, imageFile);
+      
+      if (uploadError) {
+          console.error("Upload Error:", uploadError);
+          throw new Error("Image upload failed: " + uploadError.message);
+      }
+
+      // 2. Get URL
+      const { data: urlData } = supabase.storage
+        .from('property-images')
+        .getPublicUrl(fileName);
+
+      // 3. Insert Property (No user ID needed)
+      const { error: insertError } = await supabase.from('properties').insert({
+        title: formData.title,
+        price: parseFloat(formData.price),
+        location: formData.location,
+        type: formData.type,
+        landlord_name: formData.landlord_name,
+        landlord_phone: formData.landlord_phone,
+        // landlord_id is omitted (anonymous)
+        image_url: urlData.publicUrl,
+        images: [urlData.publicUrl],
+        amenities: amenities,
+        status: 'active'
+      });
+
+      if (insertError) {
+          console.error("Database Insert Error:", insertError);
+          throw insertError;
+      }
+
+      alert('Property is now live!');
+      navigate('/find-houses');
+
+    } catch (err) {
+      console.error("Caught Error:", err);
+      alert('Failed to post property: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="max-w-4xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-800">Add New Property</h1>
-        <p className="text-gray-500">Fill in the details below to list a new property.</p>
-      </div>
+    <div className="p-4 md:p-8 max-w-2xl mx-auto">
+      <h1 className="text-3xl font-bold text-gray-800 mb-2">Add New Property</h1>
+      <p className="text-gray-500 mb-6">Fee: KES {POST_FEE} per post.</p>
 
-      <form onSubmit={handleSubmit} className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
+      {isPaid && (
+        <div className="bg-green-50 border border-green-200 text-green-800 p-4 rounded-xl mb-6">
+          <p className="font-bold">✅ Payment Successful!</p>
+          <p className="text-sm">Your details are restored. Please select image and click "Publish Now".</p>
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="bg-white p-8 rounded-2xl shadow-lg border space-y-6">
         
-        {/* Section 1: Basic Info */}
-        <div className="mb-8">
-          <h3 className="text-lg font-bold text-gray-800 mb-4 border-b pb-2">Basic Information</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Property Title</label>
-              <input 
-                type="text" name="title" value={formData.title} onChange={handleChange}
-                className="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-blue"
-                placeholder="e.g. Spacious 2-Bedroom Apartment"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Property Type</label>
-              <select 
-                name="type" value={formData.type} onChange={handleChange}
-                className="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-blue bg-white"
-              >
-                <option>Apartment</option>
-                <option>House</option>
-                <option>Studio</option>
-                <option>Bedsitter</option>
-                <option>Single Room</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
-              <input 
-                type="text" name="location" value={formData.location} onChange={handleChange}
-                className="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-blue"
-                placeholder="e.g. Westlands, Nairobi"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Monthly Rent (KES)</label>
-              <input 
-                type="number" name="price" value={formData.price} onChange={handleChange}
-                className="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-blue"
-                placeholder="e.g. 50000"
-                required
-              />
-            </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="md:col-span-2">
+            <label className="block text-sm font-semibold mb-2">Property Title</label>
+            <input name="title" value={formData.title} onChange={handleChange} className="w-full border p-3 rounded-lg" required />
           </div>
-          <div className="mt-6">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-            <textarea 
-              name="description" value={formData.description} onChange={handleChange}
-              rows="4"
-              className="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-blue"
-              placeholder="Describe your property..."
-            ></textarea>
-          </div>
-        </div>
-
-        {/* Section 2: Image Upload */}
-        <div className="mb-8">
-          <h3 className="text-lg font-bold text-gray-800 mb-4 border-b pb-2">Property Images</h3>
           
-          <div className="border-2 border-dashed border-gray-200 rounded-xl p-6 text-center hover:border-primary-blue transition-colors">
-            <input type="file" id="images" multiple accept="image/*" onChange={handleImageChange} className="hidden" />
-            <label htmlFor="images" className="cursor-pointer">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-blue-50 flex items-center justify-center text-primary-blue">
-                <i className="fas fa-cloud-upload-alt text-2xl"></i>
-              </div>
-              <p className="text-gray-600 font-semibold">Click to upload images</p>
-              <p className="text-gray-400 text-sm">PNG, JPG up to 5MB</p>
-            </label>
+          <div>
+            <label className="block text-sm font-semibold mb-2">Price (KES)</label>
+            <input name="price" type="number" value={formData.price} onChange={handleChange} className="w-full border p-3 rounded-lg" required />
           </div>
-
-          {/* Image Previews */}
-          {images.length > 0 && (
-            <div className="grid grid-cols-3 md:grid-cols-6 gap-3 mt-4">
-              {images.map((img, index) => (
-                <div key={index} className="relative group">
-                  <img src={img.preview} alt="Preview" className="w-full h-20 object-cover rounded-lg border" />
-                  <button 
-                    type="button"
-                    onClick={() => removeImage(index)}
-                    className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white rounded-full text-xs opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
-                  >
-                    <i className="fas fa-times"></i>
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
+          
+          <div>
+            <label className="block text-sm font-semibold mb-2">Property Type</label>
+            <select name="type" value={formData.type} onChange={handleChange} className="w-full border p-3 rounded-lg bg-white">
+              <option>Single Room</option>
+              <option>Bedsitter</option>
+              <option>1 Bedroom</option>
+              <option>2 Bedroom</option>
+            </select>
+          </div>
         </div>
 
-        {/* Section 3: Amenities */}
-        <div className="mb-8">
-          <h3 className="text-lg font-bold text-gray-800 mb-4 border-b pb-2">Amenities</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {amenitiesList.map((amenity) => (
-              <label key={amenity} className="flex items-center p-3 border border-gray-100 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
-                <input 
-                  type="checkbox" 
-                  checked={amenities.includes(amenity)}
-                  onChange={() => toggleAmenity(amenity)}
-                  className="w-4 h-4 text-primary-blue rounded mr-3 focus:ring-primary-blue"
-                />
-                <span className="text-sm font-medium text-gray-700">{amenity}</span>
-              </label>
+        <div>
+          <label className="block text-sm font-semibold mb-2">Location</label>
+          <input name="location" value={formData.location} onChange={handleChange} className="w-full border p-3 rounded-lg" required />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label className="block text-sm font-semibold mb-2">Landlord Name</label>
+            <input name="landlord_name" value={formData.landlord_name} onChange={handleChange} className="w-full border p-3 rounded-lg" required />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold mb-2">Landlord Phone</label>
+            <input name="landlord_phone" value={formData.landlord_phone} onChange={handleChange} className="w-full border p-3 rounded-lg" required />
+          </div>
+        </div>
+
+        {/* Amenities */}
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-3">Amenities</label>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {amenityOptions.map((amenity) => (
+              <button
+                key={amenity}
+                type="button"
+                onClick={() => toggleAmenity(amenity)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium border transition-all ${
+                  amenities.includes(amenity)
+                    ? 'bg-blue-50 border-blue-500 text-blue-700 shadow-sm'
+                    : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                {amenity}
+              </button>
             ))}
           </div>
         </div>
 
-        {/* Actions */}
-        <div className="flex justify-end space-x-4 pt-4 border-t">
-          <button type="button" onClick={() => navigate('/landlord')} className="px-6 py-3 border border-gray-200 text-gray-600 font-semibold rounded-lg hover:bg-gray-50">
-            Cancel
-          </button>
-          <GradientButton type="submit" size="lg">
-            <i className="fas fa-save mr-2"></i> Save Property
-          </GradientButton>
+        <div>
+          <label className="block text-sm font-semibold mb-2">Property Image</label>
+          <input 
+            type="file" 
+            accept="image/*" 
+            onChange={(e) => setImageFile(e.target.files[0])} 
+            className="w-full text-gray-500 file:mr-4 file:py-2 file:px-4 file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" 
+          />
         </div>
+
+        <button
+          type="submit"
+          disabled={loading}
+          className={`w-full font-bold py-3 px-6 rounded-xl transition shadow-lg ${
+            isPaid 
+              ? 'bg-green-600 hover:bg-green-700 text-white' 
+              : 'bg-blue-600 hover:bg-blue-700 text-white'
+          }`}
+        >
+          {loading 
+            ? 'Processing...' 
+            : isPaid 
+              ? 'Publish Property Now' 
+              : `Pay KES ${POST_FEE} to Post`
+          }
+        </button>
 
       </form>
     </div>
