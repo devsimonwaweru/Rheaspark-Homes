@@ -1,8 +1,9 @@
+// src/pages/AddProperty.jsx
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
-const POST_FEE = 35;
+const POST_FEE = 50; // KES for landlord posting
 
 export default function AddProperty() {
   const [formData, setFormData] = useState({
@@ -32,6 +33,14 @@ export default function AddProperty() {
       setFormData(parsedData.formData);
       setAmenities(parsedData.amenities || []);
       localStorage.removeItem('pending_property_data');
+
+      // Auto-publish property after payment
+      if (parsedData.imageFile) {
+        setImageFile(parsedData.imageFile);
+      }
+      if (parsedData.autoPublish) {
+        handleSubmitAuto(parsedData.formData, parsedData.amenities, parsedData.imageFile);
+      }
     }
   }, [searchParams]);
 
@@ -47,39 +56,22 @@ export default function AddProperty() {
     }
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    if (!isPaid) {
-      localStorage.setItem('pending_property_data', JSON.stringify({ formData, amenities }));
-      navigate(`/payment?type=post_property&price=${POST_FEE}`);
-      return;
-    }
-
-    if (!imageFile) {
-        alert("Please select an image to finish publishing.");
-        return;
-    }
-
+  // AUTO-PUBLISH after payment
+  const handleSubmitAuto = async (formData, amenities, imageFile) => {
+    if (!imageFile) return;
     setLoading(true);
     try {
-      // 1. Upload Image
       const fileName = `prop-${Date.now()}-${imageFile.name.replace(/\s/g, '-')}`;
       const { error: uploadError } = await supabase.storage
         .from('property-images')
         .upload(fileName, imageFile);
-      
-      if (uploadError) {
-          console.error("Upload Error:", uploadError);
-          throw new Error("Image upload failed: " + uploadError.message);
-      }
 
-      // 2. Get URL
+      if (uploadError) throw uploadError;
+
       const { data: urlData } = supabase.storage
         .from('property-images')
         .getPublicUrl(fileName);
 
-      // 3. Insert Property (No user ID needed)
       const { error: insertError } = await supabase.from('properties').insert({
         title: formData.title,
         price: parseFloat(formData.price),
@@ -87,54 +79,66 @@ export default function AddProperty() {
         type: formData.type,
         landlord_name: formData.landlord_name,
         landlord_phone: formData.landlord_phone,
-        // landlord_id is omitted (anonymous)
         image_url: urlData.publicUrl,
         images: [urlData.publicUrl],
         amenities: amenities,
         status: 'active'
       });
 
-      if (insertError) {
-          console.error("Database Insert Error:", insertError);
-          throw insertError;
-      }
+      if (insertError) throw insertError;
 
-      alert('Property is now live!');
+      alert('✅ Property Posted Successfully!');
       navigate('/find-houses');
 
     } catch (err) {
-      console.error("Caught Error:", err);
+      console.error('Publish Error:', err);
       alert('Failed to post property: ' + err.message);
     } finally {
       setLoading(false);
     }
   };
 
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (!isPaid) {
+      // Save property data for post-payment publishing
+      localStorage.setItem('pending_property_data', JSON.stringify({
+        formData, amenities, imageFile, autoPublish: true
+      }));
+
+      // Redirect to payment page
+      navigate(`/payment?type=post_property&amount=${POST_FEE}`);
+      return;
+    }
+
+    // If already paid, manually publish
+    handleSubmitAuto(formData, amenities, imageFile);
+  };
+
   return (
     <div className="p-4 md:p-8 max-w-2xl mx-auto">
-      <h1 className="text-3xl font-bold text-gray-800 mb-2">Add New Property</h1>
+      <h1 className="text-3xl font-bold mb-2">Add New Property</h1>
       <p className="text-gray-500 mb-6">Fee: KES {POST_FEE} per post.</p>
 
       {isPaid && (
         <div className="bg-green-50 border border-green-200 text-green-800 p-4 rounded-xl mb-6">
           <p className="font-bold">✅ Payment Successful!</p>
-          <p className="text-sm">Your details are restored. Please select image and click "Publish Now".</p>
+          <p className="text-sm">Your details are restored. Select image and click "Publish Now".</p>
         </div>
       )}
 
       <form onSubmit={handleSubmit} className="bg-white p-8 rounded-2xl shadow-lg border space-y-6">
-        
+        {/* Form fields same as before */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="md:col-span-2">
             <label className="block text-sm font-semibold mb-2">Property Title</label>
             <input name="title" value={formData.title} onChange={handleChange} className="w-full border p-3 rounded-lg" required />
           </div>
-          
           <div>
             <label className="block text-sm font-semibold mb-2">Price (KES)</label>
             <input name="price" type="number" value={formData.price} onChange={handleChange} className="w-full border p-3 rounded-lg" required />
           </div>
-          
           <div>
             <label className="block text-sm font-semibold mb-2">Property Type</label>
             <select name="type" value={formData.type} onChange={handleChange} className="w-full border p-3 rounded-lg bg-white">
@@ -162,7 +166,6 @@ export default function AddProperty() {
           </div>
         </div>
 
-        {/* Amenities */}
         <div>
           <label className="block text-sm font-semibold text-gray-700 mb-3">Amenities</label>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -209,7 +212,6 @@ export default function AddProperty() {
               : `Pay KES ${POST_FEE} to Post`
           }
         </button>
-
       </form>
     </div>
   );
