@@ -1,42 +1,34 @@
-// src/pages/PaymentPage.jsx
 import React, { useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 
 export default function PaymentPage() {
+  const location = useLocation();
+  const { amount = 0, type = "room", property_id = null } = location.state || {};
+
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
 
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const handlePayment = async (e) => {
+    e.preventDefault();
 
-  // Get query params
-  const type = searchParams.get("type"); // post_property / view_property
-  const amount = searchParams.get("amount");
-  const property_id = searchParams.get("property_id");
-
-  const handlePayment = async () => {
     if (!phone) {
-      setError("Please enter your phone number");
+      setMessage("Please enter your phone number.");
       return;
     }
-
-    // Basic phone validation
-    if (!phone.startsWith("254") || phone.length !== 12) {
-      setError("Phone must be in format 2547XXXXXXXX");
-      return;
-    }
-
-    setLoading(true);
-    setError("");
 
     try {
-      const response = await fetch(
-        "https://zxyvvlqbwwiakndtipbn.supabase.co/functions/v1/initiate-payment",
+      setLoading(true);
+      setMessage("");
+
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/initiate-payment`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+            apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
           },
           body: JSON.stringify({
             amount: Number(amount),
@@ -47,59 +39,61 @@ export default function PaymentPage() {
         }
       );
 
-      const data = await response.json();
+      const data = await res.json();
       console.log("Payment Response:", data);
 
-      if (response.ok) {
-        alert("Payment initiated! Check your phone for M-PESA prompt.");
-
-        // Navigate to success page
-        navigate(
-          `/payment-success?type=${type}&amount=${amount}&property_id=${property_id || ""}`
-        );
-      } else {
-        setError(data.error || "Payment failed. Try again.");
+      if (!res.ok) {
+        throw new Error(data.error || "Payment failed");
       }
-    } catch (err) {
-      console.error("Payment Error:", err);
-      setError("Failed to initiate payment. Please try again.");
+
+      setMessage("STK Push sent! Check your phone to complete payment.");
+    } catch (error) {
+      console.error("Payment error:", error);
+      setMessage(error.message || "Something went wrong.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="max-w-md mx-auto p-6 bg-white shadow-xl rounded-xl mt-12">
-      <h1 className="text-2xl font-bold mb-4 text-center">
-        Pay KES {amount}
-      </h1>
+    <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
+      <div className="bg-white shadow-lg rounded-xl p-6 w-full max-w-md">
+        <h2 className="text-2xl font-bold mb-4 text-center">
+          Complete Payment
+        </h2>
 
-      <p className="text-gray-600 mb-4 text-center">
-        Payment for:{" "}
-        <span className="font-semibold">
-          {type ? type.replace("_", " ") : ""}
-        </span>
-      </p>
+        <p className="mb-4 text-gray-600 text-center">
+          Amount: <span className="font-semibold">KES {amount}</span>
+        </p>
 
-      <input
-        type="tel"
-        placeholder="Enter phone number (2547XXXXXXXX)"
-        value={phone}
-        onChange={(e) => setPhone(e.target.value)}
-        className="w-full border p-3 rounded-lg mb-4"
-      />
+        <form onSubmit={handlePayment} className="space-y-4">
+          <input
+            type="tel"
+            placeholder="07XXXXXXXX"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            className="w-full border rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
 
-      {error && (
-        <p className="text-red-500 mb-4 text-center">{error}</p>
-      )}
+          <button
+            type="submit"
+            disabled={loading}
+            className={`w-full text-white py-3 rounded-lg transition ${
+              loading
+                ? "bg-gray-400 cursor-not-allowed"
+                : "bg-blue-600 hover:bg-blue-700"
+            }`}
+          >
+            {loading ? "Processing..." : "Pay Now"}
+          </button>
+        </form>
 
-      <button
-        onClick={handlePayment}
-        disabled={loading}
-        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition"
-      >
-        {loading ? "Processing..." : "Pay Now"}
-      </button>
+        {message && (
+          <p className="mt-4 text-center text-sm text-red-600">
+            {message}
+          </p>
+        )}
+      </div>
     </div>
   );
 }
