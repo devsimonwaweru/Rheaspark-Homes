@@ -1,8 +1,9 @@
 import React, { useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 
 export default function PaymentPage() {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
 
   const amount = Number(searchParams.get("price")) || 0;
   const type = searchParams.get("type") || "general";
@@ -14,10 +15,7 @@ export default function PaymentPage() {
 
   const handlePayment = async (e) => {
     e.preventDefault();
-    if (!phone) {
-      setMessage("Please enter your phone number");
-      return;
-    }
+    if (!phone) return setMessage("Enter your phone number");
 
     setLoading(true);
     setMessage("");
@@ -32,12 +30,7 @@ export default function PaymentPage() {
             Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
             apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
           },
-          body: JSON.stringify({
-            amount,
-            phone,
-            type,
-            property_id: propertyId,
-          }),
+          body: JSON.stringify({ amount, phone, type, property_id: propertyId }),
         }
       );
 
@@ -47,6 +40,12 @@ export default function PaymentPage() {
       if (!res.ok) throw new Error(data.error || "Payment failed");
 
       setMessage("✅ STK Push sent! Check your phone to complete payment.");
+      setTimeout(() => {
+        navigate(
+          `/payment-success?type=${type}&property_id=${propertyId}`,
+          { replace: true }
+        );
+      }, 1000);
 
     } catch (err) {
       console.error(err);
@@ -66,9 +65,7 @@ export default function PaymentPage() {
           Complete Payment
         </h2>
 
-        <p className="mb-4 text-center">
-          Amount: <b>KES {amount}</b>
-        </p>
+        <p className="mb-4 text-center">Amount: <b>KES {amount}</b></p>
 
         <input
           type="tel"
@@ -90,11 +87,7 @@ export default function PaymentPage() {
         </button>
 
         {message && (
-          <p
-            className={`mt-4 text-center ${
-              message.startsWith("✅") ? "text-green-600" : "text-red-600"
-            }`}
-          >
+          <p className={`mt-4 text-center ${message.startsWith("✅") ? "text-green-600" : "text-red-600"}`}>
             {message}
           </p>
         )}

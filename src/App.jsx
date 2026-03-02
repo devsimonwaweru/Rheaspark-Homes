@@ -9,7 +9,8 @@ import WhatsAppButton from './components/WhatsAppButton';
 // Public Pages
 import Home from './pages/Home';
 import FindHouses from './pages/FindHouses';
-import Payment from './pages/PaymentPage';
+import PaymentPage from './pages/PaymentPage';
+import PaymentSuccess from './pages/PaymentSuccess';
 import MoversPage from './pages/MoversPage';
 
 // Landlord Dashboard
@@ -32,7 +33,6 @@ function App() {
   return (
     <Router>
       <div className="flex flex-col min-h-screen">
-
         <Routes>
 
           {/* ========================================== */}
@@ -62,20 +62,21 @@ function App() {
           </Route>
 
           {/* ========================================== */}
-          {/* PUBLIC ROUTES (With Header/Footer) */}
+          {/* PUBLIC ROUTES (Header/Footer) */}
           {/* ========================================== */}
           <Route
-            path="*"
+            path="/"
             element={
               <>
                 <Header />
                 <main className="flex-grow">
                   <Routes>
-                    <Route path="/" element={<Home />} />
-                    <Route path="/find-houses" element={<FindHouses />} />
-                    <Route path="/payment" element={<Payment />} />
-                    <Route path="/movers" element={<MoversPage />} />
-                    
+                    <Route index element={<Home />} />
+                    <Route path="find-houses" element={<FindHouses />} />
+                    <Route path="payment" element={<PaymentPage />} />
+                    <Route path="payment-success" element={<PaymentSuccess />} />
+                    <Route path="movers" element={<MoversPage />} />
+
                     {/* Fallback for unmatched public routes */}
                     <Route path="*" element={<Home />} />
                   </Routes>
@@ -87,7 +88,6 @@ function App() {
           />
 
         </Routes>
-
       </div>
     </Router>
   );

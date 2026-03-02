@@ -13,7 +13,8 @@ serve(async (req) => {
   }
 
   try {
-    const { amount, phone, type, property_id } = await req.json();
+    const body = await req.json();
+    const { amount, phone, type, property_id } = body;
 
     if (!amount || !phone || !type) {
       return new Response(
@@ -23,21 +24,15 @@ serve(async (req) => {
     }
 
     // Format phone: 07XXXXXXXX or 7XXXXXXXX → 2547XXXXXXXX
-    const formatPhone = (phone: string) => {
-      let cleaned = phone.replace(/\D/g, "");
-      if (cleaned.startsWith("0")) cleaned = "254" + cleaned.substring(1);
-      else if (cleaned.startsWith("7")) cleaned = "254" + cleaned;
-      return cleaned;
-    };
+    let cleaned = phone.replace(/\D/g, "");
+    if (cleaned.startsWith("0")) cleaned = "254" + cleaned.slice(1);
+    else if (cleaned.startsWith("7")) cleaned = "254" + cleaned;
 
-    const formattedPhone = formatPhone(phone);
-
-    // Secret key from Supabase env
     const SECRET_KEY = Deno.env.get("INTASEND_SECRET_KEY");
     if (!SECRET_KEY) throw new Error("INTASEND_SECRET_KEY missing");
 
-    // Call IntaSend STK Push API
-    const paymentResponse = await fetch(
+    // IntaSend STK Push
+    const response = await fetch(
       "https://payment.intasend.com/api/v1/payment/mpesa-stk-push/",
       {
         method: "POST",
@@ -47,7 +42,7 @@ serve(async (req) => {
         },
         body: JSON.stringify({
           amount: Number(amount),
-          phone_number: formattedPhone,
+          phone_number: cleaned,
           api_ref: `rheaspark-${Date.now()}`,
           comment: `${type}-${property_id || "general"}`,
         }),
@@ -56,17 +51,18 @@ serve(async (req) => {
 
     let data;
     try {
-      data = await paymentResponse.json();
+      data = await response.json();
     } catch {
-      const text = await paymentResponse.text();
+      const text = await response.text();
       return new Response(
         JSON.stringify({ error: "Payment gateway failed", details: text }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
+    // Always return status + response
     return new Response(JSON.stringify(data), {
-      status: 200,
+      status: response.status,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
 
