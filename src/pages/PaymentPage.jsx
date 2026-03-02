@@ -2,12 +2,11 @@ import React, { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 export default function PaymentPage() {
-
   const [searchParams] = useSearchParams();
 
-  const amount = Number(searchParams.get("price"));
-  const type = searchParams.get("type");
-  const propertyId = searchParams.get("property_id");
+  const amount = Number(searchParams.get("price")) || 0;
+  const type = searchParams.get("type") || "general";
+  const propertyId = searchParams.get("property_id") || "";
 
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
@@ -15,11 +14,15 @@ export default function PaymentPage() {
 
   const handlePayment = async (e) => {
     e.preventDefault();
+    if (!phone) {
+      setMessage("Please enter your phone number");
+      return;
+    }
+
+    setLoading(true);
+    setMessage("");
 
     try {
-      setLoading(true);
-      setMessage("");
-
       const res = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/initiate-payment`,
         {
@@ -39,30 +42,27 @@ export default function PaymentPage() {
       );
 
       const data = await res.json();
+      console.log("Payment Response:", data);
 
-      console.log(data);
+      if (!res.ok) throw new Error(data.error || "Payment failed");
 
-      if (!res.ok) {
-        throw new Error(data.error || "Payment failed");
-      }
-
-      setMessage("✅ STK Push sent. Check your phone!");
+      setMessage("✅ STK Push sent! Check your phone to complete payment.");
 
     } catch (err) {
       console.error(err);
-      setMessage(err.message);
+      setMessage(err.message || "Something went wrong");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex justify-center items-center bg-gray-100">
+    <div className="min-h-screen flex justify-center items-center bg-gray-100 p-4">
       <form
         onSubmit={handlePayment}
-        className="bg-white p-6 rounded-xl shadow-md w-96"
+        className="bg-white p-6 rounded-xl shadow-md w-full max-w-md"
       >
-        <h2 className="text-xl font-bold mb-4 text-center">
+        <h2 className="text-2xl font-bold mb-4 text-center">
           Complete Payment
         </h2>
 
@@ -82,13 +82,21 @@ export default function PaymentPage() {
         <button
           type="submit"
           disabled={loading}
-          className="bg-blue-600 text-white w-full py-3 rounded"
+          className={`w-full py-3 rounded text-white ${
+            loading ? "bg-gray-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
+          }`}
         >
           {loading ? "Processing..." : "Pay Now"}
         </button>
 
         {message && (
-          <p className="mt-4 text-center">{message}</p>
+          <p
+            className={`mt-4 text-center ${
+              message.startsWith("✅") ? "text-green-600" : "text-red-600"
+            }`}
+          >
+            {message}
+          </p>
         )}
       </form>
     </div>
