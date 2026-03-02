@@ -9,7 +9,7 @@ import WhatsAppButton from './components/WhatsAppButton';
 // Public Pages
 import Home from './pages/Home';
 import FindHouses from './pages/FindHouses';
-import Payment from './pages/PaymentPage';
+import PaymentPage from './pages/PaymentPage';
 import MoversPage from './pages/MoversPage';
 
 // Landlord Dashboard
@@ -32,9 +32,7 @@ function App() {
   return (
     <Router>
       <div className="flex flex-col min-h-screen">
-
         <Routes>
-
           {/* ========================================== */}
           {/* ADMIN ROUTES */}
           {/* ========================================== */}
@@ -62,32 +60,26 @@ function App() {
           </Route>
 
           {/* ========================================== */}
-          {/* PUBLIC ROUTES (With Header/Footer) */}
+          {/* PUBLIC ROUTES */}
           {/* ========================================== */}
           <Route
-            path="*"
             element={
               <>
                 <Header />
-                <main className="flex-grow">
-                  <Routes>
-                    <Route path="/" element={<Home />} />
-                    <Route path="/find-houses" element={<FindHouses />} />
-                    <Route path="/payment" element={<Payment />} />
-                    <Route path="/movers" element={<MoversPage />} />
-                    
-                    {/* Fallback for unmatched public routes */}
-                    <Route path="*" element={<Home />} />
-                  </Routes>
-                </main>
-                <Footer />
                 <WhatsAppButton />
+                <Footer />
               </>
             }
-          />
+          >
+            <Route path="/" element={<Home />} />
+            <Route path="/find-houses" element={<FindHouses />} />
+            <Route path="/payment" element={<PaymentPage />} />
+            <Route path="/movers" element={<MoversPage />} />
 
+            {/* Catch-all public route */}
+            <Route path="*" element={<Home />} />
+          </Route>
         </Routes>
-
       </div>
     </Router>
   );

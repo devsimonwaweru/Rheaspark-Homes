@@ -1,3 +1,4 @@
+// src/pages/FindHouses.jsx
 import React, { useState, useEffect } from "react";
 import { supabase } from "../lib/supabaseClient";
 import PropertyCard from "../components/PropertyCard";
@@ -13,11 +14,13 @@ export default function FindHouses() {
   // Map properties and get full image URL from Supabase bucket
   const mapProperties = (data) => {
     return data.map((p) => {
-      let image = p.images?.length
-        ? supabase.storage
-            .from("property-images")
-            .getPublicUrl(p.images[0]).publicUrl
-        : p.image_url || "/placeholder.jpg";
+      // Use first image from bucket if exists, otherwise fallback to image_url or placeholder
+      const image =
+        p.images?.length > 0
+          ? supabase.storage
+              .from("property-images")
+              .getPublicUrl(p.images[0]).publicUrl
+          : p.image_url || "/images/no-image.jpg";
 
       return {
         ...p,
@@ -30,6 +33,7 @@ export default function FindHouses() {
   useEffect(() => {
     const fetchProperties = async () => {
       setLoading(true);
+
       const { data, error } = await supabase
         .from("properties")
         .select("*")
@@ -80,6 +84,7 @@ export default function FindHouses() {
           <p className="text-gray-500 text-lg">Browse verified listings.</p>
         </div>
 
+        {/* Filter panel placeholder */}
         <FilterPanel onSearch={() => {}} onFilter={() => {}} />
 
         <div className="flex justify-between items-center mb-6">
