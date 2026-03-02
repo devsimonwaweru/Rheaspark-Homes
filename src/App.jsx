@@ -29,66 +29,67 @@ import AdminDashboard from './pages/AdminDashboard';
 import AdminMovers from './pages/AdminMovers';
 import AdminLandlords from './pages/AdminLandlords';
 
+// Public layout wrapper
+const PublicLayout = ({ children }) => (
+  <>
+    <Header />
+    <main className="flex-grow">{children}</main>
+    <Footer />
+    <WhatsAppButton />
+  </>
+);
+
 function App() {
   return (
     <Router>
-      <div className="flex flex-col min-h-screen">
-        <Routes>
+      <Routes>
 
-          {/* ========================================== */}
-          {/* ADMIN ROUTES */}
-          {/* ========================================== */}
-          <Route path="/admin/*" element={<AdminLayout />}>
-            <Route index element={<AdminDashboard />} />
-            <Route path="movers" element={<AdminMovers />} />
-            <Route path="landlords" element={<AdminLandlords />} />
-          </Route>
+        {/* ==================== ADMIN ==================== */}
+        <Route path="/admin/*" element={<AdminLayout />}>
+          <Route index element={<AdminDashboard />} />
+          <Route path="movers" element={<AdminMovers />} />
+          <Route path="landlords" element={<AdminLandlords />} />
+        </Route>
 
-          {/* ========================================== */}
-          {/* LANDLORD ROUTES */}
-          {/* ========================================== */}
-          <Route path="/landlord/*" element={<LandlordDashboard />}>
-            <Route index element={<LandlordHome />} />
-            <Route path="add-property" element={<AddProperty />} />
-          </Route>
+        {/* ==================== LANDLORD ==================== */}
+        <Route path="/landlord/*" element={<LandlordDashboard />}>
+          <Route index element={<LandlordHome />} />
+          <Route path="add-property" element={<AddProperty />} />
+        </Route>
 
-          {/* ========================================== */}
-          {/* MOVER ROUTES */}
-          {/* ========================================== */}
-          <Route path="/mover/*" element={<MoverDashboard />}>
-            <Route index element={<MoverHome />} />
-            <Route path="jobs" element={<MoverJobs />} />
-            <Route path="profile" element={<MoverHome />} />
-          </Route>
+        {/* ==================== MOVER ==================== */}
+        <Route path="/mover/*" element={<MoverDashboard />}>
+          <Route index element={<MoverHome />} />
+          <Route path="jobs" element={<MoverJobs />} />
+          <Route path="profile" element={<MoverHome />} />
+        </Route>
 
-          {/* ========================================== */}
-          {/* PUBLIC ROUTES (Header/Footer) */}
-          {/* ========================================== */}
-          <Route
-            path="/"
-            element={
-              <>
-                <Header />
-                <main className="flex-grow">
-                  <Routes>
-                    <Route index element={<Home />} />
-                    <Route path="find-houses" element={<FindHouses />} />
-                    <Route path="payment" element={<PaymentPage />} />
-                    <Route path="payment-success" element={<PaymentSuccess />} />
-                    <Route path="movers" element={<MoversPage />} />
+        {/* ==================== PUBLIC ==================== */}
+        <Route
+          path="/"
+          element={<PublicLayout><Home /></PublicLayout>}
+        />
+        <Route
+          path="/find-houses"
+          element={<PublicLayout><FindHouses /></PublicLayout>}
+        />
+        <Route
+          path="/payment"
+          element={<PublicLayout><PaymentPage /></PublicLayout>}
+        />
+        <Route
+          path="/payment-success"
+          element={<PublicLayout><PaymentSuccess /></PublicLayout>}
+        />
+        <Route
+          path="/movers"
+          element={<PublicLayout><MoversPage /></PublicLayout>}
+        />
 
-                    {/* Fallback for unmatched public routes */}
-                    <Route path="*" element={<Home />} />
-                  </Routes>
-                </main>
-                <Footer />
-                <WhatsAppButton />
-              </>
-            }
-          />
+        {/* Fallback */}
+        <Route path="*" element={<PublicLayout><Home /></PublicLayout>} />
 
-        </Routes>
-      </div>
+      </Routes>
     </Router>
   );
 }
