@@ -4,7 +4,7 @@ export default function WhatsAppButton() {
   return (
     <div className="fixed bottom-8 right-8 z-50 animate-bounce-slow">
       <a 
-        href="https://wa.me/254769525570?text=Hello%20Rheaspark,%20I%20need%20help%20with..." 
+        href="https://wa.me/254717710054?text=Hello%20Rheaspark,%20I%20need%20help%20with..." 
         target="_blank" 
         rel="noopener noreferrer"
         className="group flex items-center"
