@@ -59,11 +59,11 @@ export default function Footer() {
             <ul className="space-y-3">
               <li className="flex items-center text-sm text-gray-300">
                 <i className="fas fa-phone-alt text-primary-green mr-3"></i>
-                +254 769 525 570
+                +254 717 710 054
               </li>
               <li className="flex items-center text-sm text-gray-300">
                 <i className="fas fa-envelope text-primary-green mr-3"></i>
-                wenbusale383@gmail.com
+                Hillarymuhanga6@gmail.com
               </li>
               <li className="flex items-start text-sm text-gray-300">
                 <i className="fas fa-map-marker-alt text-primary-green mr-3 mt-1"></i>
