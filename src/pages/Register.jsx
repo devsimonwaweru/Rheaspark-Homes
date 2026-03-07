@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { useNavigate, Link } from 'react-router-dom';
+import SubscriptionModal from '../components/SubscriptionModal';
+import PaymentModal from '../components/PaymentModal';
 
 export default function Register() {
   const navigate = useNavigate();
@@ -12,6 +14,11 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
+
+  // Modal States
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [newUserId, setNewUserId] = useState(null);
 
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
 
@@ -27,31 +34,34 @@ export default function Register() {
     setLoading(true);
     setError(null);
 
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-      email,
-      password
-    });
-
-    if (authError) {
-      setError(authError.message);
-      setLoading(false);
-      return;
-    }
-
-    const userId = authData.user.id;
-
     try {
+      // 1. Create Auth User
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email,
+        password
+      });
+
+      if (authError) throw authError;
+
+      const userId = authData.user.id;
+      setNewUserId(userId); // Store ID for later use
+
       if (role === "landlord") {
+        // 2. Insert Landlord (Status defaults to inactive in DB)
         const { error: landlordError } = await supabase
           .from("landlords")
           .insert([
             { id: userId, full_name: fullName, business_name: fullName, email: email }
           ]);
+
         if (landlordError) throw landlordError;
-        navigate("/landlord");
+        
+        // 3. Show Subscription Modal instead of navigating
+        setLoading(false);
+        setShowSubscriptionModal(true);
 
       } else {
-        // Normal User (Tenant)
+        // Normal User Flow
         const { error: userError } = await supabase
           .from("users")
           .insert([
@@ -61,19 +71,45 @@ export default function Register() {
         if (userError) throw userError;
         navigate("/user/dashboard");
       }
+
     } catch (err) {
       console.error("Profile creation error:", err);
       setError(err.message);
+    } finally {
       setLoading(false);
     }
-    
-    setLoading(false);
+  };
+
+  // Callback when Payment is successful
+  const handlePaymentSuccess = async () => {
+    try {
+      // Update Landlord Subscription Status
+      const expiresAt = new Date();
+      expiresAt.setMonth(expiresAt.getMonth() + 1); // Add 1 month
+
+      const { error } = await supabase
+        .from('landlords')
+        .update({
+          subscription_status: 'active',
+          subscription_expires_at: expiresAt.toISOString()
+        })
+        .eq('id', newUserId);
+
+      if (error) throw error;
+
+      // Navigate to Dashboard
+      navigate("/landlord");
+      
+    } catch (err) {
+      console.error("Error updating subscription:", err);
+      setError("Payment successful, but failed to activate account. Contact support.");
+    }
   };
 
   return (
     <div className="min-h-screen flex bg-gray-50 font-sans">
       
-      {/* Left Side - Branding with Parallax Hover Effect */}
+      {/* Left Side - Branding */}
       <div 
         className="hidden lg:flex w-1/2 bg-gradient-to-br from-emerald-800 to-blue-900 text-white p-12 flex-col justify-center relative overflow-hidden"
         onMouseMove={handleMouseMove}
@@ -86,10 +122,6 @@ export default function Register() {
         <div 
           className="absolute bottom-20 left-20 w-72 h-72 bg-blue-400 rounded-full mix-blend-multiply filter blur-3xl opacity-30 transition-transform duration-300 ease-out"
           style={{ transform: `translate(${mousePos.x * 0.04}px, ${mousePos.y * 0.04}px)` }}
-        ></div>
-        <div 
-          className="absolute bottom-1/3 right-1/4 w-80 h-80 bg-cyan-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 transition-transform duration-300 ease-out"
-          style={{ transform: `translate(${mousePos.x * 0.02}px, ${mousePos.y * -0.02}px)` }}
         ></div>
 
         <div className="relative z-10 transition-transform duration-300 ease-out"
@@ -207,6 +239,27 @@ export default function Register() {
 
         </div>
       </div>
+
+      {/* Modals */}
+      <SubscriptionModal 
+        isOpen={showSubscriptionModal}
+        onClose={() => setShowSubscriptionModal(false)}
+        onConfirm={() => {
+          setShowSubscriptionModal(false);
+          setShowPaymentModal(true);
+        }}
+      />
+
+      <PaymentModal 
+        isOpen={showPaymentModal}
+        onClose={(success) => {
+          setShowPaymentModal(false);
+          if (success) handlePaymentSuccess();
+        }}
+        amount={50}
+        type="subscription"
+        propertyId={null}
+      />
     </div>
   );
 }

@@ -1,20 +1,21 @@
-// src/pages/FindHouses.jsx
 import React, { useState, useEffect } from "react";
 import { supabase } from "../lib/supabaseClient";
+import { useNavigate } from "react-router-dom"; // Added useNavigate
 import PropertyCard from "../components/PropertyCard";
 import PropertyDetailsModal from "../components/PropertyDetailsModal";
 import FilterPanel from "../components/FilterPanel";
 
 export default function FindHouses() {
+  const navigate = useNavigate();
   const [properties, setProperties] = useState([]);
   const [selectedProperty, setSelectedProperty] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [sessionChecked, setSessionChecked] = useState(false);
 
   // Map properties and get full image URL from Supabase bucket
   const mapProperties = (data) => {
     return data.map((p) => {
-      // Use first image from bucket if exists, otherwise fallback to image_url or placeholder
       const image =
         p.images?.length > 0
           ? supabase.storage
@@ -31,6 +32,19 @@ export default function FindHouses() {
   };
 
   useEffect(() => {
+    // 1. Check Authentication
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        navigate('/login'); // Redirect if not logged in
+      } else {
+        setSessionChecked(true);
+      }
+    };
+
+    checkAuth();
+
+    // 2. Fetch Properties Function
     const fetchProperties = async () => {
       setLoading(true);
 
@@ -44,9 +58,12 @@ export default function FindHouses() {
       setLoading(false);
     };
 
-    fetchProperties();
+    // Only fetch if session is confirmed (avoids flash of content)
+    if (sessionChecked) {
+      fetchProperties();
+    }
 
-    // Realtime subscription for new properties
+    // 3. Realtime subscription for new properties
     const channel = supabase
       .channel("public:properties")
       .on(
@@ -64,12 +81,21 @@ export default function FindHouses() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [navigate, sessionChecked]);
 
   const handleViewDetails = (property) => {
     setSelectedProperty(property);
     setIsModalOpen(true);
   };
+
+  // Don't render anything until session is checked (prevents flicker)
+  if (!sessionChecked) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -77,7 +103,7 @@ export default function FindHouses() {
         <div className="mb-10 text-center">
           <h1 className="text-4xl md:text-5xl font-bold mb-4 text-gray-800">
             Find Your{" "}
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-emerald-500">
               Perfect Home
             </span>
           </h1>
@@ -96,6 +122,7 @@ export default function FindHouses() {
 
         {loading ? (
           <div className="text-center py-20 text-gray-400">
+            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-600 mx-auto mb-4"></div>
             Loading properties...
           </div>
         ) : (

@@ -1,4 +1,3 @@
-/* eslint-disable no-unused-vars */
 // src/App.jsx
 
 import React, { useEffect, useState } from "react";
@@ -10,12 +9,11 @@ import Header from "./components/Header";
 import Footer from "./components/Footer";
 import WhatsAppButton from "./components/WhatsAppButton";
 import ProtectedRoute from "./components/ProtectedRoute";
+import PaymentModal from "./components/PaymentModal";
 
 // Public Pages
 import Home from "./pages/Home";
 import FindHouses from "./pages/FindHouses";
-import PaymentPage from "./pages/PaymentPage";
-import PaymentSuccess from "./pages/PaymentSuccess";
 import MoversPage from "./pages/MoversPage";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -26,7 +24,6 @@ import UserDashboard from "./pages/UserDashboard";
 // Landlord Dashboard
 import LandlordDashboard from "./pages/LandlordDashboard";
 import LandlordHome from "./pages/LandlordHome";
-// REMOVED: import AddProperty from "./pages/AddProperty"; <--- This line caused the error
 
 // Mover Dashboard
 import MoverDashboard from "./pages/MoverDashboard";
@@ -123,7 +120,8 @@ function App() {
           <Route path="movers" element={<AdminMovers />} />
           <Route path="landlords" element={<AdminLandlords />} />
         </Route>
-        
+
+
         {/* ==================== USER / SEEKER ==================== */}
         
         <Route
@@ -147,7 +145,6 @@ function App() {
           }
         >
           <Route index element={<LandlordHome />} />
-          {/* REMOVED: <Route path="add-property" element={<AddProperty />} /> */}
         </Route>
 
 
@@ -171,8 +168,6 @@ function App() {
 
         <Route path="/" element={<PublicLayout><Home /></PublicLayout>} />
         <Route path="/find-houses" element={<PublicLayout><FindHouses /></PublicLayout>} />
-        <Route path="/payment" element={<PublicLayout><PaymentPage /></PublicLayout>} />
-        <Route path="/payment-success" element={<PublicLayout><PaymentSuccess /></PublicLayout>} />
         <Route path="/movers" element={<PublicLayout><MoversPage /></PublicLayout>} />
 
 
