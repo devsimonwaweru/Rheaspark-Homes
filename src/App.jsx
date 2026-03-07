@@ -20,6 +20,7 @@ import Register from "./pages/Register";
 
 // User Dashboard
 import UserDashboard from "./pages/UserDashboard";
+import SubscriptionPage from "./pages/SubscriptionPage";
 
 // Landlord Dashboard
 import LandlordDashboard from "./pages/LandlordDashboard";
@@ -131,6 +132,16 @@ function App() {
               <UserDashboard />
             </ProtectedRoute>
           }
+        />
+
+        {/* ==================== SUBSCRIPTION ==================== */}
+        <Route 
+          path="/subscription" 
+          element={
+            <ProtectedRoute>
+              <SubscriptionPage />
+            </ProtectedRoute>
+          } 
         />
 
 

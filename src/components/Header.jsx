@@ -1,5 +1,5 @@
 /* eslint-disable react-hooks/immutability */
-/* eslint-disable no-unused-vars */
+
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
@@ -35,15 +35,20 @@ export default function Header() {
         // 1. Check Landlord
         const { data: landlordData } = await supabase
           .from('landlords')
-          .select('full_name')
+          .select('full_name, subscription_status') // Fetch subscription_status
           .eq('id', userId)
           .single();
 
         if (landlordData) {
+          // If not subscribed, send them to subscription page on click
+          const targetPath = landlordData.subscription_status === 'active' 
+            ? '/landlord' 
+            : '/subscription';
+
           setUserProfile({ 
             name: landlordData.full_name, 
             role: 'landlord', 
-            path: '/landlord' 
+            path: targetPath 
           });
           return;
         }

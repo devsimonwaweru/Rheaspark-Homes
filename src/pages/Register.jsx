@@ -1,12 +1,9 @@
 import React, { useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { useNavigate, Link } from 'react-router-dom';
-import SubscriptionModal from '../components/SubscriptionModal';
-import PaymentModal from '../components/PaymentModal';
 
 export default function Register() {
   const navigate = useNavigate();
-
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
@@ -14,12 +11,8 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
-
-  // Modal States
-  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [newUserId, setNewUserId] = useState(null);
-
+  
+  // Parallax state
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
 
   const handleMouseMove = (e) => {
@@ -42,12 +35,10 @@ export default function Register() {
       });
 
       if (authError) throw authError;
-
       const userId = authData.user.id;
-      setNewUserId(userId); // Store ID for later use
 
       if (role === "landlord") {
-        // 2. Insert Landlord (Status defaults to inactive in DB)
+        // 2. Insert Landlord
         const { error: landlordError } = await supabase
           .from("landlords")
           .insert([
@@ -56,9 +47,8 @@ export default function Register() {
 
         if (landlordError) throw landlordError;
         
-        // 3. Show Subscription Modal instead of navigating
-        setLoading(false);
-        setShowSubscriptionModal(true);
+        // 3. Redirect to Subscription Page
+        navigate("/subscription");
 
       } else {
         // Normal User Flow
@@ -73,36 +63,10 @@ export default function Register() {
       }
 
     } catch (err) {
-      console.error("Profile creation error:", err);
+      console.error("Error:", err);
       setError(err.message);
     } finally {
       setLoading(false);
-    }
-  };
-
-  // Callback when Payment is successful
-  const handlePaymentSuccess = async () => {
-    try {
-      // Update Landlord Subscription Status
-      const expiresAt = new Date();
-      expiresAt.setMonth(expiresAt.getMonth() + 1); // Add 1 month
-
-      const { error } = await supabase
-        .from('landlords')
-        .update({
-          subscription_status: 'active',
-          subscription_expires_at: expiresAt.toISOString()
-        })
-        .eq('id', newUserId);
-
-      if (error) throw error;
-
-      // Navigate to Dashboard
-      navigate("/landlord");
-      
-    } catch (err) {
-      console.error("Error updating subscription:", err);
-      setError("Payment successful, but failed to activate account. Contact support.");
     }
   };
 
@@ -154,13 +118,12 @@ export default function Register() {
           )}
 
           <form onSubmit={handleRegister} className="space-y-5">
-            
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
               <input
                 type="text"
                 placeholder="Enter your full name"
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition shadow-sm hover:shadow-md"
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition shadow-sm"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 required
@@ -172,7 +135,7 @@ export default function Register() {
               <input
                 type="email"
                 placeholder="Enter your email"
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition shadow-sm hover:shadow-md"
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition shadow-sm"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -185,26 +148,17 @@ export default function Register() {
                 <input
                   type={showPassword ? "text" : "password"}
                   placeholder="Create a password"
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition shadow-sm hover:shadow-md pr-12"
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition shadow-sm pr-12"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
                 />
                 <button 
                   type="button" 
-                  className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                  className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
                   onClick={() => setShowPassword(!showPassword)}
                 >
-                  {showPassword ? (
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                    </svg>
-                  ) : (
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                    </svg>
-                  )}
+                  {showPassword ? "Hide" : "Show"}
                 </button>
               </div>
             </div>
@@ -214,7 +168,7 @@ export default function Register() {
               <select
                 value={role}
                 onChange={(e) => setRole(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition shadow-sm hover:shadow-md bg-white appearance-none cursor-pointer"
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition shadow-sm bg-white"
               >
                 <option value="user">User (Tenant)</option>
                 <option value="landlord">Landlord</option>
@@ -223,7 +177,7 @@ export default function Register() {
 
             <button
               type="submit"
-              className="w-full text-white p-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed bg-gradient-to-r from-blue-600 to-emerald-500"
+              className="w-full text-white p-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition bg-gradient-to-r from-blue-600 to-emerald-500 disabled:opacity-50"
               disabled={loading}
             >
               {loading ? "Registering..." : "Register"}
@@ -232,34 +186,12 @@ export default function Register() {
 
           <p className="text-center text-gray-400 text-sm mt-8">
             Already have an account? {' '}
-            <Link to="/login" className="font-semibold text-blue-600 hover:text-blue-500 hover:underline transition-colors">
+            <Link to="/login" className="font-semibold text-blue-600 hover:underline">
               Sign In
             </Link>
           </p>
-
         </div>
       </div>
-
-      {/* Modals */}
-      <SubscriptionModal 
-        isOpen={showSubscriptionModal}
-        onClose={() => setShowSubscriptionModal(false)}
-        onConfirm={() => {
-          setShowSubscriptionModal(false);
-          setShowPaymentModal(true);
-        }}
-      />
-
-      <PaymentModal 
-        isOpen={showPaymentModal}
-        onClose={(success) => {
-          setShowPaymentModal(false);
-          if (success) handlePaymentSuccess();
-        }}
-        amount={50}
-        type="subscription"
-        propertyId={null}
-      />
     </div>
   );
 }
