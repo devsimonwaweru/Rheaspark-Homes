@@ -26,7 +26,7 @@ import UserDashboard from "./pages/UserDashboard";
 // Landlord Dashboard
 import LandlordDashboard from "./pages/LandlordDashboard";
 import LandlordHome from "./pages/LandlordHome";
-import AddProperty from "./pages/AddProperty";
+// REMOVED: import AddProperty from "./pages/AddProperty"; <--- This line caused the error
 
 // Mover Dashboard
 import MoverDashboard from "./pages/MoverDashboard";
@@ -147,7 +147,7 @@ function App() {
           }
         >
           <Route index element={<LandlordHome />} />
-          <Route path="add-property" element={<AddProperty />} />
+          {/* REMOVED: <Route path="add-property" element={<AddProperty />} /> */}
         </Route>
 
 
