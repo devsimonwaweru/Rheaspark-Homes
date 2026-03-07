@@ -1,22 +1,35 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import LandlordSidebar from '../components/LandlordSidebar';
+import AddPropertyModal from '../components/AddPropertyModal';
 
 export default function LandlordDashboard() {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const openModal = () => setIsModalOpen(true);
+  const closeModal = () => setIsModalOpen(false);
+
   return (
-    <div className="flex min-h-screen bg-gray-50 font-sans">
-      {/* Sidebar - Hidden on mobile, visible on md+ */}
-      <div className="hidden md:block w-64 bg-white border-r border-gray-100 flex-shrink-0">
-        <LandlordSidebar />
-      </div>
+    <div className="flex flex-col md:flex-row min-h-screen bg-gray-50 font-sans">
+      
+      {/* 
+         Pass openModal function to Sidebar so the button there can trigger the modal 
+      */}
+      <LandlordSidebar onAddProperty={openModal} />
       
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* This is where LandlordHome or AddProperty will be rendered */}
         <main className="flex-1 overflow-y-auto">
-          <Outlet />
+          {/* 
+             Pass openModal to children (LandlordHome) via context.
+             LandlordHome will access this using useOutletContext.
+          */}
+          <Outlet context={{ openAddPropertyModal: openModal }} />
         </main>
       </div>
+
+      {/* The Global Modal Component */}
+      <AddPropertyModal isOpen={isModalOpen} onClose={closeModal} />
     </div>
   );
 }
