@@ -42,12 +42,18 @@ export default function Login() {
     // 1. Check Landlord table
     const { data: landlord } = await supabase
       .from('landlords')
-      .select('id')
+      .select('id, subscription_status') // Fetch subscription_status
       .eq('id', user.id)
       .single();
 
     if (landlord) {
-      navigate('/landlord');
+      // REDIRECT LOGIC FOR LANDLORDS
+      if (landlord.subscription_status === 'active') {
+        navigate('/landlord');
+      } else {
+        // If not subscribed, force them to subscription page
+        navigate('/subscription');
+      }
       setLoading(false);
       return;
     }

@@ -9,7 +9,6 @@ import Header from "./components/Header";
 import Footer from "./components/Footer";
 import WhatsAppButton from "./components/WhatsAppButton";
 import ProtectedRoute from "./components/ProtectedRoute";
-import PaymentModal from "./components/PaymentModal";
 
 // Public Pages
 import Home from "./pages/Home";
@@ -37,7 +36,6 @@ import AdminDashboard from "./pages/AdminDashboard";
 import AdminMovers from "./pages/AdminMovers";
 import AdminLandlords from "./pages/AdminLandlords";
 
-
 // ---------------- PUBLIC LAYOUT ----------------
 const PublicLayout = ({ children }) => (
   <>
@@ -48,31 +46,25 @@ const PublicLayout = ({ children }) => (
   </>
 );
 
-
 // ---------------- APP ----------------
 function App() {
-
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/immutability
-    checkSession();
+    // 1. Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setLoading(false);
+    });
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+    // 2. Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
     });
 
-    return () => {
-      listener.subscription.unsubscribe();
-    };
+    return () => subscription.unsubscribe();
   }, []);
-
-  async function checkSession() {
-    const { data } = await supabase.auth.getSession();
-    setSession(data.session);
-    setLoading(false);
-  }
 
   if (loading) {
     return (
@@ -87,28 +79,20 @@ function App() {
       <Routes>
 
         {/* ==================== AUTH ==================== */}
-
         <Route
           path="/login"
           element={
-            session
-              ? <Navigate to="/" replace />
-              : <PublicLayout><Login /></PublicLayout>
+            session ? <Navigate to="/" replace /> : <PublicLayout><Login /></PublicLayout>
           }
         />
-
         <Route
           path="/register"
           element={
-            session
-              ? <Navigate to="/" replace />
-              : <PublicLayout><Register /></PublicLayout>
+            session ? <Navigate to="/" replace /> : <PublicLayout><Register /></PublicLayout>
           }
         />
 
-
         {/* ==================== ADMIN ==================== */}
-
         <Route
           path="/admin/*"
           element={
@@ -122,9 +106,7 @@ function App() {
           <Route path="landlords" element={<AdminLandlords />} />
         </Route>
 
-
         {/* ==================== USER / SEEKER ==================== */}
-        
         <Route
           path="/user/dashboard"
           element={
@@ -135,18 +117,16 @@ function App() {
         />
 
         {/* ==================== SUBSCRIPTION ==================== */}
-        <Route 
-          path="/subscription" 
+        <Route
+          path="/subscription"
           element={
             <ProtectedRoute>
               <SubscriptionPage />
             </ProtectedRoute>
-          } 
+          }
         />
 
-
         {/* ==================== LANDLORD ==================== */}
-
         <Route
           path="/landlord/*"
           element={
@@ -158,9 +138,7 @@ function App() {
           <Route index element={<LandlordHome />} />
         </Route>
 
-
         {/* ==================== MOVER ==================== */}
-
         <Route
           path="/mover/*"
           element={
@@ -174,16 +152,12 @@ function App() {
           <Route path="profile" element={<MoverHome />} />
         </Route>
 
-
         {/* ==================== PUBLIC ==================== */}
-
         <Route path="/" element={<PublicLayout><Home /></PublicLayout>} />
         <Route path="/find-houses" element={<PublicLayout><FindHouses /></PublicLayout>} />
         <Route path="/movers" element={<PublicLayout><MoversPage /></PublicLayout>} />
 
-
         {/* ==================== FALLBACK ==================== */}
-
         <Route path="*" element={<PublicLayout><Home /></PublicLayout>} />
 
       </Routes>

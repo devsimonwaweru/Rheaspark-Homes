@@ -7,28 +7,33 @@ const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
+  const [session, setSession] = useState(null); // 1. Add session state
   const [role, setRole] = useState(null);
   const [loading, setLoading] = useState(true);
 
   async function getUserRole(userId) {
+    // Check landlords table for role (or roles table if you use that)
+    // Keeping your existing logic for role check
     const { data, error } = await supabase
-      .from("roles")
-      .select("role")
+      .from("landlords") 
+      .select("id")
       .eq("id", userId)
       .single();
 
-    if (data) setRole(data.role);
+    if (data) setRole('landlord');
+    else setRole('user');
   }
 
   useEffect(() => {
     const getSession = async () => {
       const { data } = await supabase.auth.getSession();
-      const currentUser = data?.session?.user || null;
+      const currentSession = data?.session;
+      
+      setSession(currentSession); // 2. Set session
+      setUser(currentSession?.user ?? null);
 
-      setUser(currentUser);
-
-      if (currentUser) {
-        await getUserRole(currentUser.id);
+      if (currentSession?.user) {
+        await getUserRole(currentSession.user.id);
       }
 
       setLoading(false);
@@ -38,11 +43,11 @@ export function AuthProvider({ children }) {
 
     const { data: listener } = supabase.auth.onAuthStateChange(
       async (_, session) => {
-        const currentUser = session?.user || null;
-        setUser(currentUser);
+        setSession(session); // 3. Update session on change
+        setUser(session?.user ?? null);
 
-        if (currentUser) {
-          await getUserRole(currentUser.id);
+        if (session?.user) {
+          await getUserRole(session.user.id);
         } else {
           setRole(null);
         }
@@ -54,8 +59,9 @@ export function AuthProvider({ children }) {
     };
   }, []);
 
+  // 4. Pass session in value
   return (
-    <AuthContext.Provider value={{ user, role, loading }}>
+    <AuthContext.Provider value={{ user, session, role, loading }}>
       {children}
     </AuthContext.Provider>
   );

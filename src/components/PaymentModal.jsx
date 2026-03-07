@@ -34,36 +34,23 @@ export default function PaymentModal({ isOpen, onClose, amount, type, propertyId
     setMessage("");
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        throw new Error("You must be logged in to pay");
+      // FIX: Explicit session check
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error("Session expired. Please log in again.");
       }
 
       // Call Supabase Edge Function
-      const res = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/initiate-payment`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          },
-          body: JSON.stringify({ 
-            amount, 
-            phone, 
-            type, 
-            property_id: propertyId,
-            user_id: user.id 
-          }),
+      const { data, error: funcError } = await supabase.functions.invoke('initiate-payment', {
+        body: { 
+          phone, 
+          type, 
+          property_id: propertyId 
         }
-      );
+      });
 
-      const data = await res.json();
-      
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to initiate payment");
-      }
+      if (funcError) throw funcError;
+      if (data?.error) throw new Error(data.error);
 
       // Move to Pending State
       setPaymentId(data.payment_id);
@@ -71,12 +58,14 @@ export default function PaymentModal({ isOpen, onClose, amount, type, propertyId
       setMessage("STK Push sent! Please check your phone...");
       
       // Start Polling
-      startPolling(data.payment_id);
+      if (data.payment_id) {
+        startPolling(data.payment_id);
+      }
 
     } catch (err) {
       console.error(err);
       setStatus("failed");
-      setMessage(err.message);
+      setMessage(err.message || "Failed to initiate payment");
     }
   };
 
@@ -94,12 +83,11 @@ export default function PaymentModal({ isOpen, onClose, amount, type, propertyId
 
         if (error) throw error;
 
-        if (data.status === "completed") {
+        if (data.status === "paid" || data.status === "completed") {
           clearInterval(pollingRef.current);
           setStatus("success");
           setMessage("Payment Successful!");
           
-          // Auto-close after 2 seconds and signal success
           setTimeout(() => {
             onClose(true); 
           }, 2000);
@@ -111,7 +99,7 @@ export default function PaymentModal({ isOpen, onClose, amount, type, propertyId
       } catch (err) {
         console.error("Polling error:", err);
       }
-    }, 3000); // Poll every 3 seconds
+    }, 3000);
   };
 
   if (!isOpen) return null;

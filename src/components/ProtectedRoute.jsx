@@ -1,5 +1,4 @@
-
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
 
@@ -15,7 +14,7 @@ export default function ProtectedRoute({ children }) {
 
     const checkUserStatus = async () => {
       try {
-        // 1. Get Session
+        // 1. Get Session directly
         const { data: { session } } = await supabase.auth.getSession();
         
         if (!isMounted) return;
@@ -34,11 +33,10 @@ export default function ProtectedRoute({ children }) {
 
           if (landlordData) {
             setUserRole('landlord');
-            // Check if subscription is active (Assuming 'active' is the string in DB)
             const subscribed = landlordData.subscription_status === 'active';
             setIsSubscribed(subscribed);
           } else {
-            // 3. Check if Mover
+            // 3. Check Mover
             const { data: moverData } = await supabase
               .from('movers')
               .select('id')
@@ -47,7 +45,7 @@ export default function ProtectedRoute({ children }) {
 
             if (moverData) {
               setUserRole('mover');
-              setIsSubscribed(true); // Movers don't require subscription for this logic
+              setIsSubscribed(true);
             } else {
               // 4. Default User
               setUserRole('user');
@@ -65,22 +63,20 @@ export default function ProtectedRoute({ children }) {
     checkUserStatus();
 
     // Listen for auth changes
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       if (!session) {
         setUserRole(null);
         setIsSubscribed(false);
+        setLoading(false);
       } else {
-        // Re-check status on auth change just in case
         checkUserStatus();
       }
     });
 
     return () => {
       isMounted = false;
-      if (listener && listener.subscription) {
-        listener.subscription.unsubscribe();
-      }
+      subscription.unsubscribe();
     };
   }, [location]);
 
@@ -95,17 +91,14 @@ export default function ProtectedRoute({ children }) {
     );
   }
 
-  // 1. Not Logged In -> Login
   if (!session) {
     return <Navigate to="/login" replace />;
   }
 
-  // 2. Landlord Check: Not Subscribed -> Redirect to Subscription Page
-  // We allow access if they are already on the subscription page to prevent loops
+  // Redirect unsubscribed landlords to subscription page
   if (userRole === 'landlord' && !isSubscribed && location.pathname !== '/subscription') {
     return <Navigate to="/subscription" replace />;
   }
 
-  // 3. Access Granted
   return children;
 }
