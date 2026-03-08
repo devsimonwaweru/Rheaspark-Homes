@@ -18,6 +18,7 @@ export default function SubscriptionPage() {
         navigate('/login');
       } else {
         setUser(session.user);
+        // Check if already active
         const { data: landlord } = await supabase
           .from('landlords')
           .select('subscription_status')
@@ -38,24 +39,28 @@ export default function SubscriptionPage() {
       return;
     }
     
+    // Basic phone validation (optional but good)
+    if (phone.length < 9) {
+        setError("Please enter a valid phone number.");
+        return;
+    }
+
     setProcessing(true);
     setError(null);
 
     try {
-      // We use fetch directly. 
-      // We DO NOT need Authorization headers anymore because we turned off "Verify JWT".
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/initiate-payment`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "apikey": import.meta.env.VITE_SUPABASE_ANON_KEY // Good practice to keep apikey
+            "apikey": import.meta.env.VITE_SUPABASE_ANON_KEY 
           },
           body: JSON.stringify({ 
             phone: phone, 
             type: 'subscription',
-            userId: user.id // Backend uses this ID directly
+            userId: user.id 
           }),
         }
       );
@@ -67,6 +72,7 @@ export default function SubscriptionPage() {
       }
 
       alert("STK Push sent! Please check your phone.");
+      // Start polling for the result
       pollPaymentStatus(data.payment_id);
 
     } catch (err) {
@@ -78,51 +84,57 @@ export default function SubscriptionPage() {
 
   const pollPaymentStatus = async (paymentId) => {
     let attempts = 0;
+    const maxAttempts = 60; // Poll for 2 minutes (60 * 2 seconds)
+    
     const interval = setInterval(async () => {
       attempts++;
       try {
-        const { data: payment } = await supabase
+        const { data: payment, error: pollError } = await supabase
           .from('payments')
           .select('status')
           .eq('id', paymentId)
           .single();
 
+        if (pollError) throw pollError;
+
         if (payment?.status === 'paid') {
           clearInterval(interval);
-          await activateSubscription();
-        } else if (attempts >= 30 || payment?.status === 'failed') {
+          // The DB Trigger already activated the account.
+          // Just redirect the user.
+          handleSuccess(); 
+        } else if (payment?.status === 'failed') {
           clearInterval(interval);
-          setError("Payment timed out.");
+          setError("Payment failed. Please try again.");
+          setProcessing(false);
+        } else if (attempts >= maxAttempts) {
+          clearInterval(interval);
+          setError("Payment timed out. Check your M-Pesa messages.");
           setProcessing(false);
         }
-      } catch (e) { console.error(e); }
+      } catch (e) { 
+        console.error("Polling error:", e); 
+      }
     }, 2000);
   };
 
-  const activateSubscription = async () => {
-    try {
-      const expiresAt = new Date();
-      expiresAt.setMonth(expiresAt.getMonth() + 1);
-      await supabase
-        .from('landlords')
-        .update({ subscription_status: 'active', subscription_expires_at: expiresAt.toISOString() })
-        .eq('id', user.id);
-      alert("Success! Account Activated.");
-      navigate('/landlord');
-    } catch (e) {
-      setError("Activation failed.");
-      setProcessing(false);
-    }
+  const handleSuccess = () => {
+    alert("Success! Account Activated.");
+    setProcessing(false);
+    // Navigate them to the dashboard
+    navigate('/landlord'); 
   };
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-600"></div></div>;
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-600"></div>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-           {/* ... Header JSX ... */}
-           <h1 className="text-3xl font-bold text-gray-800">Activate Your Account</h1>
+          <h1 className="text-3xl font-bold text-gray-800">Activate Your Account</h1>
         </div>
 
         <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
@@ -132,7 +144,6 @@ export default function SubscriptionPage() {
           </div>
 
           <div className="p-6 space-y-4">
-             {/* ... Features List JSX ... */}
              <ul className="space-y-3">
               <li className="flex items-center text-gray-700">
                 <svg className="w-5 h-5 mr-3 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>
