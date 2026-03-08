@@ -1,4 +1,3 @@
-/* eslint-disable no-unused-vars */
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
@@ -10,6 +9,7 @@ export default function SubscriptionPage() {
   const [processing, setProcessing] = useState(false);
   const [phone, setPhone] = useState('');
   const [error, setError] = useState(null);
+  const [paymentId, setPaymentId] = useState(null); // Store current payment ID
 
   useEffect(() => {
     const checkUser = async () => {
@@ -18,7 +18,6 @@ export default function SubscriptionPage() {
         navigate('/login');
       } else {
         setUser(session.user);
-        // Check if already active
         const { data: landlord } = await supabase
           .from('landlords')
           .select('subscription_status')
@@ -39,14 +38,9 @@ export default function SubscriptionPage() {
       return;
     }
     
-    // Basic phone validation (optional but good)
-    if (phone.length < 9) {
-        setError("Please enter a valid phone number.");
-        return;
-    }
-
     setProcessing(true);
     setError(null);
+    setPaymentId(null);
 
     try {
       const response = await fetch(
@@ -72,7 +66,7 @@ export default function SubscriptionPage() {
       }
 
       alert("STK Push sent! Please check your phone.");
-      // Start polling for the result
+      setPaymentId(data.payment_id); // Save ID for manual check
       pollPaymentStatus(data.payment_id);
 
     } catch (err) {
@@ -82,9 +76,9 @@ export default function SubscriptionPage() {
     }
   };
 
-  const pollPaymentStatus = async (paymentId) => {
+  const pollPaymentStatus = async (pId) => {
     let attempts = 0;
-    const maxAttempts = 60; // Poll for 2 minutes (60 * 2 seconds)
+    const maxAttempts = 60; 
     
     const interval = setInterval(async () => {
       attempts++;
@@ -92,24 +86,22 @@ export default function SubscriptionPage() {
         const { data: payment, error: pollError } = await supabase
           .from('payments')
           .select('status')
-          .eq('id', paymentId)
+          .eq('id', pId)
           .single();
 
         if (pollError) throw pollError;
 
         if (payment?.status === 'paid') {
           clearInterval(interval);
-          // The DB Trigger already activated the account.
-          // Just redirect the user.
           handleSuccess(); 
         } else if (payment?.status === 'failed') {
           clearInterval(interval);
-          setError("Payment failed. Please try again.");
+          setError("Payment failed.");
           setProcessing(false);
         } else if (attempts >= maxAttempts) {
           clearInterval(interval);
-          setError("Payment timed out. Check your M-Pesa messages.");
-          setProcessing(false);
+          setError("Automatic check timed out. Use button below if you paid.");
+          // Don't stop processing entirely, let them click manual button
         }
       } catch (e) { 
         console.error("Polling error:", e); 
@@ -117,24 +109,44 @@ export default function SubscriptionPage() {
     }, 2000);
   };
 
+  const handleManualCheck = async () => {
+    if (!paymentId) return;
+    
+    try {
+        const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/verify-payment`, {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json', 
+                'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY 
+            },
+            body: JSON.stringify({ paymentId })
+        });
+        const data = await res.json();
+        
+        if (data.status === 'paid') {
+            handleSuccess();
+        } else {
+            alert("Not confirmed yet. If you paid, wait 10 seconds and try again.");
+        }
+    } catch (e) {
+        console.error(e);
+        alert("Error checking payment.");
+    }
+  };
+
   const handleSuccess = () => {
     alert("Success! Account Activated.");
     setProcessing(false);
-    // Navigate them to the dashboard
     navigate('/landlord'); 
   };
 
-  if (loading) return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-600"></div>
-    </div>
-  );
+  if (loading) return <div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-600"></div></div>;
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-800">Activate Your Account</h1>
+           <h1 className="text-3xl font-bold text-gray-800">Activate Your Account</h1>
         </div>
 
         <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
@@ -172,6 +184,17 @@ export default function SubscriptionPage() {
             >
               {processing ? "Processing..." : "Pay & Activate"}
             </button>
+
+            {/* MANUAL CHECK BUTTON - ONLY SHOWS WHEN PROCESSING */}
+            {processing && (
+              <button
+                onClick={handleManualCheck}
+                className="w-full mt-2 text-blue-600 border border-blue-200 hover:bg-blue-50 font-medium py-3 rounded-xl transition-all text-sm"
+              >
+                I have paid, verify now
+              </button>
+            )}
+
           </div>
         </div>
       </div>
