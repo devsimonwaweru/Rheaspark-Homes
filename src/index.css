@@ -1,4 +1,6 @@
-/* 1. IMPORTS MUST BE AT THE VERY TOP */
+/* src/index.css */
+
+/* 1. IMPORTS */
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
 
 /* 2. TAILWIND DIRECTIVES */
@@ -18,31 +20,45 @@ h1, h2, h3, h4, h5, h6 {
 
 /* 4. CUSTOM UTILITY CLASSES */
 .gradient-text {
-  @apply text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600;
+  @apply text-transparent bg-clip-text bg-gradient-to-r from-[#2FA4E7] to-[#3CB371];
 }
 
 .glass-card {
   @apply bg-white/80 backdrop-blur-md shadow-xl border border-white/20;
 }
 
-/* 5. CUSTOM COMPONENTS & ANIMATIONS */
+/* 5. CUSTOM COMPONENT STYLES */
 
-/* Landlord Sidebar Animation */
+/* --- Sidebar Link Animation --- */
 .sidebar-link {
-  @apply relative overflow-hidden;
+  position: relative;
+  @apply block py-3 px-4 rounded-lg transition-all duration-300;
 }
 
 .sidebar-link::before {
   content: '';
-  @apply absolute left-0 top-0 h-full w-1 bg-blue-600 transform -translate-x-full transition-transform duration-300;
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 4px;
+  background: linear-gradient(to bottom, #2FA4E7, #3CB371);
+  transform: scaleY(0);
+  transition: transform 0.3s ease;
+  border-radius: 0 4px 4px 0;
 }
 
 .sidebar-link:hover::before,
 .sidebar-link.active::before {
-  @apply translate-x-0;
+  transform: scaleY(1);
 }
 
-/* Property Card Hover Effects */
+.sidebar-link:hover,
+.sidebar-link.active {
+  @apply bg-gray-700 text-white;
+}
+
+/* --- Property Card Hover --- */
 .property-card {
   @apply transition-all duration-300 ease-out;
 }
@@ -55,7 +71,7 @@ h1, h2, h3, h4, h5, h6 {
   @apply scale-110;
 }
 
-/* Gradient Borders */
+/* --- Gradient Border Utility --- */
 .gradient-border {
   position: relative;
   background: white;
@@ -77,7 +93,7 @@ h1, h2, h3, h4, h5, h6 {
   pointer-events: none;
 }
 
-/* Navigation Link Hover Effect */
+/* --- Navigation Underline Effect --- */
 .nav-link {
   position: relative;
   @apply pb-1;
@@ -101,7 +117,7 @@ h1, h2, h3, h4, h5, h6 {
   transform-origin: bottom left;
 }
 
-/* Button Shine Effect */
+/* --- Button Shine Effect --- */
 .btn-shine {
   position: relative;
   overflow: hidden;
@@ -130,25 +146,7 @@ h1, h2, h3, h4, h5, h6 {
   40%, 100% { left: 100%; }
 }
 
-/* Custom Scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: #f1f1f1;
-}
-
-::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, #2FA4E7, #3CB371);
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #555;
-}
-
-/* Dropdown Animation */
+/* --- Dropdown Animation --- */
 .dropdown-container {
   @apply opacity-0 scale-95 translate-y-2 pointer-events-none transition-all duration-200;
 }
@@ -157,7 +155,7 @@ h1, h2, h3, h4, h5, h6 {
   @apply opacity-100 scale-100 translate-y-0 pointer-events-auto;
 }
 
-/* Mobile Menu Animation */
+/* --- Mobile Menu Animation --- */
 .mobile-menu {
   @apply transform translate-x-full transition-transform duration-300 ease-in-out;
 }
@@ -166,17 +164,7 @@ h1, h2, h3, h4, h5, h6 {
   transform: translateX(0);
 }
 
-/* WhatsApp Button Animation */
-@keyframes bounce-slow {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-10px); }
-}
-
-.animate-bounce-slow {
-  animation: bounce-slow 3s ease-in-out infinite;
-}
-
-/* Modal Animation */
+/* --- Modal Animation --- */
 @keyframes modal-enter {
   from {
     opacity: 0;
@@ -192,7 +180,19 @@ h1, h2, h3, h4, h5, h6 {
   animation: modal-enter 0.3s ease-out forwards;
 }
 
-/* Range Slider Styling */
+/* --- WhatsApp Button Animation --- */
+@keyframes bounce-slow {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+.animate-bounce-slow {
+  animation: bounce-slow 3s ease-in-out infinite;
+}
+
+/* 6. FORM ELEMENTS */
+
+/* --- Range Slider --- */
 input[type="range"] {
   -webkit-appearance: none;
   appearance: none;
@@ -219,17 +219,29 @@ input[type="range"]::-webkit-slider-thumb:hover {
   transform: scale(1.1);
 }
 
-input[type="range"]::-moz-range-thumb {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: white;
-  border: 3px solid #2FA4E7;
-  cursor: pointer;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+/* 7. VENDOR OVERRIDES */
+
+/* --- Scrollbar --- */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
 }
 
-/* Swiper Customization */
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #2FA4E7, #3CB371);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* --- Swiper Customization --- */
 .swiper-button-next, .swiper-button-prev {
   color: white !important;
   background-color: rgba(0,0,0,0.3);
@@ -243,24 +255,6 @@ input[type="range"]::-moz-range-thumb {
   font-weight: bold;
 }
 
-@keyframes spin-slow {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-@keyframes spin-reverse-slow {
-  from { transform: rotate(360deg); }
-  to { transform: rotate(0deg); }
-}
-
-.animate-spin-slow {
-  animation: spin-slow 20s linear infinite;
-}
-
-.animate-spin-reverse-slow {
-  animation: spin-reverse-slow 15s linear infinite;
-}
-
 .swiper-pagination-bullet {
   background: white !important;
   opacity: 0.5;
@@ -269,4 +263,13 @@ input[type="range"]::-moz-range-thumb {
 .swiper-pagination-bullet-active {
   opacity: 1;
   background: white !important;
+}
+
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 20s linear infinite;
 }

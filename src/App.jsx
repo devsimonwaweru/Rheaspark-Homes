@@ -1,5 +1,4 @@
 // src/App.jsx
-
 import React, { useEffect, useState } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { supabase } from "./lib/supabaseClient";
@@ -8,7 +7,9 @@ import { supabase } from "./lib/supabaseClient";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
 import WhatsAppButton from "./components/WhatsAppButton";
-import ProtectedRoute from "./components/ProtectedRoute";
+
+// Layouts
+import AdminLayout from "./pages/AdminLayout";
 
 // Public Pages
 import Home from "./pages/Home";
@@ -30,11 +31,12 @@ import MoverDashboard from "./pages/MoverDashboard";
 import MoverHome from "./pages/MoverHome";
 import MoverJobs from "./pages/MoverJobs";
 
-// Admin Dashboard
-import AdminLayout from "./pages/AdminLayout";
+// Admin Pages
 import AdminDashboard from "./pages/AdminDashboard";
-import AdminMovers from "./pages/AdminMovers";
+import AdminUsers from "./pages/AdminUsers";
 import AdminLandlords from "./pages/AdminLandlords";
+import AdminProperties from "./pages/AdminProperties";
+import AdminMovers from "./pages/AdminMovers";
 
 // ---------------- PUBLIC LAYOUT ----------------
 const PublicLayout = ({ children }) => (
@@ -52,13 +54,11 @@ function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // 1. Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setLoading(false);
     });
 
-    // 2. Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
     });
@@ -69,7 +69,7 @@ function App() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <p className="text-lg font-semibold">Loading...</p>
+        <div className="w-16 h-16 border-4 border-t-4 border-[#2FA4E7] rounded-full animate-spin"></div>
       </div>
     );
   }
@@ -77,76 +77,36 @@ function App() {
   return (
     <Router>
       <Routes>
-
         {/* ==================== AUTH ==================== */}
         <Route
           path="/login"
-          element={
-            session ? <Navigate to="/" replace /> : <PublicLayout><Login /></PublicLayout>
-          }
+          element={session ? <Navigate to="/" replace /> : <PublicLayout><Login /></PublicLayout>}
         />
         <Route
           path="/register"
-          element={
-            session ? <Navigate to="/" replace /> : <PublicLayout><Register /></PublicLayout>
-          }
+          element={session ? <Navigate to="/" replace /> : <PublicLayout><Register /></PublicLayout>}
         />
 
-        {/* ==================== ADMIN ==================== */}
-        <Route
-          path="/admin/*"
-          element={
-            <ProtectedRoute>
-              <AdminLayout />
-            </ProtectedRoute>
-          }
-        >
+        {/* ==================== ADMIN (UNPROTECTED FOR NOW) ==================== */}
+        <Route path="/admin/*" element={<AdminLayout />}>
           <Route index element={<AdminDashboard />} />
-          <Route path="movers" element={<AdminMovers />} />
+          <Route path="users" element={<AdminUsers />} />
           <Route path="landlords" element={<AdminLandlords />} />
+          <Route path="properties" element={<AdminProperties />} />
+          <Route path="movers" element={<AdminMovers />} />
         </Route>
 
         {/* ==================== USER / SEEKER ==================== */}
-        <Route
-          path="/user/dashboard"
-          element={
-            <ProtectedRoute>
-              <UserDashboard />
-            </ProtectedRoute>
-          }
-        />
-
-        {/* ==================== SUBSCRIPTION ==================== */}
-        <Route
-          path="/subscription"
-          element={
-            <ProtectedRoute>
-              <SubscriptionPage />
-            </ProtectedRoute>
-          }
-        />
+        <Route path="/user/dashboard" element={<UserDashboard />} />
+        <Route path="/subscription" element={<SubscriptionPage />} />
 
         {/* ==================== LANDLORD ==================== */}
-        <Route
-          path="/landlord/*"
-          element={
-            <ProtectedRoute>
-              <LandlordDashboard />
-            </ProtectedRoute>
-          }
-        >
+        <Route path="/landlord/*" element={<LandlordDashboard />}>
           <Route index element={<LandlordHome />} />
         </Route>
 
         {/* ==================== MOVER ==================== */}
-        <Route
-          path="/mover/*"
-          element={
-            <ProtectedRoute>
-              <MoverDashboard />
-            </ProtectedRoute>
-          }
-        >
+        <Route path="/mover/*" element={<MoverDashboard />}>
           <Route index element={<MoverHome />} />
           <Route path="jobs" element={<MoverJobs />} />
           <Route path="profile" element={<MoverHome />} />
@@ -156,10 +116,9 @@ function App() {
         <Route path="/" element={<PublicLayout><Home /></PublicLayout>} />
         <Route path="/find-houses" element={<PublicLayout><FindHouses /></PublicLayout>} />
         <Route path="/movers" element={<PublicLayout><MoversPage /></PublicLayout>} />
-
-        {/* ==================== FALLBACK ==================== */}
-        <Route path="*" element={<PublicLayout><Home /></PublicLayout>} />
-
+        
+        {/* Fallback */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
   );

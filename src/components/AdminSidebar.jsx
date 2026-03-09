@@ -1,45 +1,93 @@
-/* eslint-disable no-undef */
+// src/components/AdminSidebar.jsx
 import React from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
-
-export default function AdminSidebar() {
-  const location = useLocation();
+const AdminSidebar = ({ closeSidebar }) => {
+  const { user, logout } = useAuth() || {}; 
   const navigate = useNavigate();
-  // eslint-disable-next-line no-undef
 
+  const handleLogout = async () => {
+    try {
+      if (logout) await logout();
+      navigate('/login');
+    } catch (error) {
+      console.error("Logout failed:", error);
+      navigate('/login');
+    }
+  };
 
-  const linkClass = (path) => 
-    `flex items-center px-4 py-3 rounded-xl mb-2 transition-all ${
-      location.pathname === path ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700'
-    }`;
+  const navItems = [
+    { name: 'Dashboard', path: '/admin', icon: 'fa-tachometer-alt' },
+    { name: 'Users', path: '/admin/users', icon: 'fa-users' },
+    { name: 'Landlords', path: '/admin/landlords', icon: 'fa-user-tie' },
+    { name: 'Properties', path: '/admin/properties', icon: 'fa-home' },
+    { name: 'Movers', path: '/admin/movers', icon: 'fa-truck' },
+  ];
 
   return (
-    <aside className="w-64 min-h-screen bg-gray-800 fixed left-0 top-0 z-30 hidden md:block">
+    <div className="h-full bg-gradient-to-b from-gray-900 to-gray-800 text-white flex flex-col w-64">
+      
+      {/* Logo Section */}
       <div className="p-6 border-b border-gray-700">
-        <h1 className="text-xl font-bold text-white">Admin Panel</h1>
-      </div>
-
-      <div className="p-4">
-        <Link to="/admin" className={linkClass('/admin')}>
-          <i className="fas fa-tachometer-alt mr-3"></i> Dashboard
-        </Link>
-        <Link to="/admin/movers" className={linkClass('/admin/movers')}>
-          <i className="fas fa-truck mr-3"></i> Movers
-        </Link>
-        <Link to="/admin/landlords" className={linkClass('/admin/landlords')}>
-          <i className="fas fa-home mr-3"></i> Landlords
-        </Link>
-        
-        <div className="mt-10 border-t border-gray-700 pt-4">
-          <button 
-            onClick={async () => { await signOut(); navigate('/'); }}
-            className="w-full flex items-center px-4 py-3 text-red-400 hover:bg-gray-700 rounded-xl"
-          >
-            <i className="fas fa-sign-out-alt mr-3"></i> Logout
-          </button>
+        <div className="flex items-center">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-r from-[#2FA4E7] to-[#3CB371] flex items-center justify-center mr-3">
+            <i className="fas fa-shield-alt text-white"></i>
+          </div>
+          <div>
+            <h1 className="text-xl font-bold">Rheaspark</h1>
+            <p className="text-xs text-gray-400">Admin Panel</p>
+          </div>
         </div>
       </div>
-    </aside>
+
+      {/* Admin Profile */}
+      <div className="p-6 border-b border-gray-700">
+        <div className="flex items-center">
+          <div className="relative">
+            <div className="w-12 h-12 rounded-full bg-gradient-to-r from-[#2FA4E7] to-[#3CB371] flex items-center justify-center border-2 border-[#3CB371]">
+              <i className="fas fa-user text-white text-lg"></i>
+            </div>
+            <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-gray-900"></div>
+          </div>
+          <div className="ml-4">
+            <h3 className="font-semibold">{user?.email || 'Admin User'}</h3>
+            <p className="text-sm text-gray-400">Administrator</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Navigation Links */}
+      <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+        {navItems.map((item) => (
+          <NavLink
+            key={item.name}
+            to={item.path}
+            onClick={() => closeSidebar && closeSidebar()}
+            className={({ isActive }) =>
+              `sidebar-link flex items-center p-3 rounded-lg hover:bg-gray-700 transition-all duration-300 ${
+                isActive ? 'active bg-gray-700 text-white' : 'text-gray-300 hover:text-white'
+              }`
+            }
+          >
+            <i className={`fas ${item.icon} w-6 mr-3`}></i>
+            <span>{item.name}</span>
+          </NavLink>
+        ))}
+      </nav>
+
+      {/* Logout Button */}
+      <div className="p-4 border-t border-gray-700">
+        <button 
+          onClick={handleLogout}
+          className="flex items-center p-3 rounded-lg hover:bg-gray-700 w-full text-left text-gray-300 hover:text-white transition-colors duration-300"
+        >
+          <i className="fas fa-sign-out-alt w-6 mr-3"></i>
+          <span>Logout</span>
+        </button>
+      </div>
+    </div>
   );
-}
+};
+
+export default AdminSidebar;
