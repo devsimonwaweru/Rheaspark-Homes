@@ -17,7 +17,7 @@ export default function Footer() {
             <p className="text-gray-300 text-sm leading-relaxed mb-4">
               Simplifying house hunting and relocation with verified listings and trusted moving services.
             </p>
-            {/* Social Icons: Facebook, Instagram, TikTok */}
+            {/* Social Icons */}
             <div className="flex space-x-3">
               <a href="#" className="w-9 h-9 rounded-full bg-blue-800 flex items-center justify-center text-white hover:bg-primary-blue transition-colors">
                 <i className="fab fa-facebook-f text-sm"></i>
@@ -74,10 +74,13 @@ export default function Footer() {
 
         </div>
 
-        {/* Copyright */}
+        {/* Copyright with Hidden Admin Link */}
         <div className="border-t border-blue-800 pt-8 text-center">
           <p className="text-gray-400 text-sm">
-            &copy; {new Date().getFullYear()} Rheaspark. All rights reserved.
+            &copy; {new Date().getFullYear()} Rheaspark.{' '}
+            <Link to="/admin/login" className="hover:text-white transition-colors cursor-default">
+              All rights reserved.
+            </Link>
           </p>
         </div>
       </div>

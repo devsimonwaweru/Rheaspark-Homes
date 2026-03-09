@@ -8,9 +8,6 @@ import Header from "./components/Header";
 import Footer from "./components/Footer";
 import WhatsAppButton from "./components/WhatsAppButton";
 
-// Layouts
-import AdminLayout from "./pages/AdminLayout";
-
 // Public Pages
 import Home from "./pages/Home";
 import FindHouses from "./pages/FindHouses";
@@ -32,6 +29,8 @@ import MoverHome from "./pages/MoverHome";
 import MoverJobs from "./pages/MoverJobs";
 
 // Admin Pages
+import AdminLogin from "./pages/AdminLogin"; // Dedicated Admin Login
+import AdminLayout from "./pages/AdminLayout";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminUsers from "./pages/AdminUsers";
 import AdminLandlords from "./pages/AdminLandlords";
@@ -54,11 +53,13 @@ function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // 1. Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setLoading(false);
     });
 
+    // 2. Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
     });
@@ -68,8 +69,11 @@ function App() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="w-16 h-16 border-4 border-t-4 border-[#2FA4E7] rounded-full animate-spin"></div>
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+        <div className="flex flex-col items-center">
+          <div className="w-16 h-16 border-4 border-t-4 border-[#2FA4E7] rounded-full animate-spin mb-4"></div>
+          <p className="text-gray-500 font-medium">Loading Application...</p>
+        </div>
       </div>
     );
   }
@@ -77,18 +81,31 @@ function App() {
   return (
     <Router>
       <Routes>
+        
         {/* ==================== AUTH ==================== */}
         <Route
           path="/login"
-          element={session ? <Navigate to="/" replace /> : <PublicLayout><Login /></PublicLayout>}
+          element={
+            session ? <Navigate to="/" replace /> : <PublicLayout><Login /></PublicLayout>
+          }
         />
         <Route
           path="/register"
-          element={session ? <Navigate to="/" replace /> : <PublicLayout><Register /></PublicLayout>}
+          element={
+            session ? <Navigate to="/" replace /> : <PublicLayout><Register /></PublicLayout>
+          }
         />
 
-        {/* ==================== ADMIN (UNPROTECTED FOR NOW) ==================== */}
-        <Route path="/admin/*" element={<AdminLayout />}>
+        {/* ==================== ADMIN LOGIN (Standalone) ==================== */}
+        {/* This is the hidden link route from the footer */}
+        <Route path="/admin/login" element={<AdminLogin />} />
+
+        {/* ==================== ADMIN PROTECTED ROUTES ==================== */}
+        {/* If user is NOT logged in, redirect to Admin Login. If logged in, show Layout. */}
+        <Route 
+          path="/admin/*" 
+          element={session ? <AdminLayout /> : <Navigate to="/admin/login" replace />} 
+        >
           <Route index element={<AdminDashboard />} />
           <Route path="users" element={<AdminUsers />} />
           <Route path="landlords" element={<AdminLandlords />} />
@@ -97,16 +114,28 @@ function App() {
         </Route>
 
         {/* ==================== USER / SEEKER ==================== */}
-        <Route path="/user/dashboard" element={<UserDashboard />} />
-        <Route path="/subscription" element={<SubscriptionPage />} />
+        <Route
+          path="/user/dashboard"
+          element={session ? <UserDashboard /> : <Navigate to="/login" replace />}
+        />
+        <Route
+          path="/subscription"
+          element={session ? <SubscriptionPage /> : <Navigate to="/login" replace />}
+        />
 
         {/* ==================== LANDLORD ==================== */}
-        <Route path="/landlord/*" element={<LandlordDashboard />}>
+        <Route
+          path="/landlord/*"
+          element={session ? <LandlordDashboard /> : <Navigate to="/login" replace />}
+        >
           <Route index element={<LandlordHome />} />
         </Route>
 
         {/* ==================== MOVER ==================== */}
-        <Route path="/mover/*" element={<MoverDashboard />}>
+        <Route
+          path="/mover/*"
+          element={session ? <MoverDashboard /> : <Navigate to="/login" replace />}
+        >
           <Route index element={<MoverHome />} />
           <Route path="jobs" element={<MoverJobs />} />
           <Route path="profile" element={<MoverHome />} />
@@ -119,6 +148,7 @@ function App() {
         
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
+
       </Routes>
     </Router>
   );

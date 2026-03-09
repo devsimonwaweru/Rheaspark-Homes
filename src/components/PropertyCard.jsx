@@ -1,12 +1,11 @@
+// src/components/PropertyCard.jsx
 import React, { useState, useMemo } from "react";
 
 export default function PropertyCard({ property, onViewDetails }) {
   const [imgError, setImgError] = useState(false);
 
-  // Display image: fallback to placeholder if error or missing
-  const displayImage = imgError || !property.image
-    ? "/placeholder.jpg"
-    : property.image;
+  // Determine if we have a valid image URL
+  const hasImage = property.image && !imgError;
 
   // Amenities parsing (robust)
   const amenitiesList = useMemo(() => {
@@ -25,14 +24,24 @@ export default function PropertyCard({ property, onViewDetails }) {
 
   return (
     <div className="bg-white rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100 flex flex-col group">
-      {/* Image */}
+      {/* Image Area */}
       <div className="relative w-full h-56 bg-gray-100 overflow-hidden">
-        <img
-          src={displayImage}
-          alt={property.title}
-          onError={() => setImgError(true)}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-        />
+        {hasImage ? (
+          <img
+            src={property.image}
+            alt={property.title}
+            onError={() => setImgError(true)}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+          />
+        ) : (
+          // Visual Fallback when no image is available
+          <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 text-gray-400">
+            <svg className="w-16 h-16 mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+            </svg>
+            <span className="text-xs font-medium uppercase tracking-wider">No Image Available</span>
+          </div>
+        )}
       </div>
 
       {/* Content */}
@@ -47,6 +56,10 @@ export default function PropertyCard({ property, onViewDetails }) {
         </div>
 
         <p className="text-gray-500 text-sm mb-2 flex items-center gap-1 truncate">
+          <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
           {property.location}
         </p>
 
