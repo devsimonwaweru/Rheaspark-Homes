@@ -1,8 +1,8 @@
-
+// src/components/AddPropertyModal.jsx
 import React, { useState, useEffect } from "react";
 import { supabase } from "../lib/supabaseClient";
 
-// --- 1. Move Components OUTSIDE to prevent re-creation on render ---
+// --- Components ---
 
 const Input = ({ label, name, value, onChange, type = "text", placeholder, required, color = "blue" }) => {
   const colorClasses = {
@@ -17,8 +17,8 @@ const Input = ({ label, name, value, onChange, type = "text", placeholder, requi
       <input
         name={name}
         type={type}
-        value={value} // Controlled by prop
-        onChange={onChange} // Controlled by prop
+        value={value}
+        onChange={onChange}
         placeholder={placeholder}
         className={`w-full bg-white border-2 ${colorClasses} rounded-xl p-3.5 text-gray-800 transition-all outline-none focus:ring-2`}
         required={required}
@@ -39,8 +39,8 @@ const Select = ({ label, name, value, onChange, options, color = "blue" }) => {
       <label className="block text-sm font-semibold text-gray-700 mb-1.5">{label}</label>
       <select
         name={name}
-        value={value} // Controlled by prop
-        onChange={onChange} // Controlled by prop
+        value={value}
+        onChange={onChange}
         className={`w-full bg-white border-2 ${colorClasses} rounded-xl p-3.5 text-gray-800 transition-all outline-none focus:ring-2 appearance-none cursor-pointer`}
       >
         {options.map(opt => <option key={opt}>{opt}</option>)}
@@ -49,14 +49,15 @@ const Select = ({ label, name, value, onChange, options, color = "blue" }) => {
   );
 };
 
-// --- 2. Main Modal Component ---
+// --- Main Modal ---
 
 export default function AddPropertyModal({ isOpen, onClose }) {
   const [loading, setLoading] = useState(false);
-  const [step, setStep] = useState(1); 
+  const [step, setStep] = useState(1);
   
-  const [imageFile, setImageFile] = useState(null);
-  const [previewUrl, setPreviewUrl] = useState(null);
+  // Changed to array for multiple images (max 3)
+  // Structure: [ { file: File, preview: string }, null, null ]
+  const [imageFiles, setImageFiles] = useState([null, null, null]);
 
   const [formData, setFormData] = useState({
     title: "", type: "Apartment", description: "",
@@ -74,14 +75,15 @@ export default function AddPropertyModal({ isOpen, onClose }) {
     "Parking", "Backup Generator"
   ];
 
+  // Cleanup preview URLs to avoid memory leaks
   useEffect(() => {
-    if (!imageFile) { setPreviewUrl(null); return; }
-    const objectUrl = URL.createObjectURL(imageFile);
-    setPreviewUrl(objectUrl);
-    return () => URL.revokeObjectURL(objectUrl);
-  }, [imageFile]);
+    return () => {
+      imageFiles.forEach(img => {
+        if (img?.preview) URL.revokeObjectURL(img.preview);
+      });
+    };
+  }, [imageFiles]);
 
-  // Standard handler works fine now
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
@@ -94,50 +96,87 @@ export default function AddPropertyModal({ isOpen, onClose }) {
     }
   };
 
+  // Handle individual file input change
+  const handleImageChange = (index, file) => {
+    if (!file) return;
+    
+    const preview = URL.createObjectURL(file);
+    
+    setImageFiles(prev => {
+      const newFiles = [...prev];
+      // Revoke old preview if replacing
+      if (newFiles[index]?.preview) URL.revokeObjectURL(newFiles[index].preview);
+      
+      newFiles[index] = { file, preview };
+      return newFiles;
+    });
+  };
+
+  // Remove image
+  const removeImage = (index) => {
+    setImageFiles(prev => {
+      const newFiles = [...prev];
+      if (newFiles[index]?.preview) URL.revokeObjectURL(newFiles[index].preview);
+      newFiles[index] = null;
+      return newFiles;
+    });
+  };
+
   const nextStep = () => setStep(prev => prev + 1);
   const prevStep = () => setStep(prev => prev - 1);
 
   const handleSubmit = async () => {
-    if (!imageFile) return alert("Please upload a property image");
+    const validImages = imageFiles.filter(Boolean);
+    if (validImages.length === 0) return alert("Please upload at least one property image");
+    
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      // 1. Upload Image
-      const fileName = `prop-${Date.now()}-${imageFile.name.replace(/\s/g, "-")}`;
-      const { error: uploadError } = await supabase.storage
-        .from("property-images")
-        .upload(fileName, imageFile);
-      
-      if (uploadError) throw uploadError;
+      // 1. Upload All Images
+      const uploadPromises = validImages.map(async (imgObj, idx) => {
+        const file = imgObj.file;
+        const fileName = `prop-${Date.now()}-${idx}-${file.name.replace(/\s/g, "-")}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from("property-images")
+          .upload(fileName, file);
+        
+        if (uploadError) throw uploadError;
 
-      const { data: urlData } = supabase.storage
-        .from("property-images")
-        .getPublicUrl(fileName);
+        const { data: urlData } = supabase.storage
+          .from("property-images")
+          .getPublicUrl(fileName);
+
+        return urlData.publicUrl;
+      });
+
+      const imageUrls = await Promise.all(uploadPromises);
 
       // 2. Insert Property
-      // Changed status to 'active' since posting is free for subscribed landlords
+      // 'images' column is text, so we store JSON string of the array
+      const propertyData = {
+        ...formData,
+        landlord_id: user.id,
+        price: parseFloat(formData.price),
+        security_deposit: parseFloat(formData.security_deposit || 0),
+        bedrooms: parseInt(formData.bedrooms),
+        bathrooms: parseInt(formData.bathrooms),
+        image_url: imageUrls[0], // First image as cover
+        images: JSON.stringify(imageUrls), // Store array of URLs
+        amenities: amenities,
+        status: "active", 
+      };
+
       const { error: insertError } = await supabase
         .from("properties")
-        .insert({
-          ...formData,
-          landlord_id: user.id,
-          price: parseFloat(formData.price),
-          security_deposit: parseFloat(formData.security_deposit || 0),
-          bedrooms: parseInt(formData.bedrooms),
-          bathrooms: parseInt(formData.bathrooms),
-          image_url: urlData.publicUrl,
-          images: [urlData.publicUrl],
-          amenities: amenities,
-          status: "active", 
-        })
+        .insert(propertyData)
         .select()
         .single();
 
       if (insertError) throw insertError;
 
-      // 3. Close Modal (No Payment Redirect)
       onClose();
 
     } catch (err) {
@@ -253,24 +292,43 @@ export default function AddPropertyModal({ isOpen, onClose }) {
       case 4: // Media & Submit
         return (
           <div className="space-y-5 animate-fade-in">
-            <h3 className="text-xl font-bold text-gray-800 mb-2">Final Touches</h3>
+            <h3 className="text-xl font-bold text-gray-800 mb-2">Media (Max 3 Images)</h3>
             
-            <div className="space-y-2">
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5">Cover Photo *</label>
-              <div className="border-2 border-dashed border-blue-300 rounded-xl p-4 hover:border-blue-500 transition-colors bg-blue-50/50 h-40 flex items-center justify-center relative overflow-hidden">
-                {previewUrl ? (
-                  <img src={previewUrl} alt="Preview" className="absolute inset-0 w-full h-full object-cover" />
-                ) : (
-                  <div className="text-center text-blue-400">
-                    <svg className="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                    <p className="text-sm font-medium">Click to upload image</p>
+            <div className="grid grid-cols-3 gap-3">
+              {[0, 1, 2].map((index) => (
+                <div key={index} className="relative aspect-square group">
+                  <div className="w-full h-full border-2 border-dashed border-blue-300 rounded-xl p-1 hover:border-blue-500 transition-colors bg-blue-50/50 flex items-center justify-center overflow-hidden relative">
+                    
+                    {imageFiles[index]?.preview ? (
+                      <>
+                        <img src={imageFiles[index].preview} alt={`Preview ${index}`} className="w-full h-full object-cover rounded-lg" />
+                        <button 
+                          type="button"
+                          onClick={() => removeImage(index)}
+                          className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-md"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+                      </>
+                    ) : (
+                      <div className="text-center text-blue-400 pointer-events-none">
+                        <svg className="w-6 h-6 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                        <p className="text-xs font-medium">Image {index + 1}</p>
+                      </div>
+                    )}
+                    
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      onChange={(e) => handleImageChange(index, e.target.files[0])} 
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
+                    />
                   </div>
-                )}
-                <input type="file" accept="image/*" onChange={(e) => setImageFile(e.target.files[0])} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
-              </div>
+                </div>
+              ))}
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 pt-4 border-t border-gray-100">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 pt-4 border-t border-gray-100 mt-6">
               <Input label="Your Name" name="landlord_name" value={formData.landlord_name} onChange={handleChange} required color="gray" />
               <Input label="Phone Number" name="landlord_phone" type="tel" value={formData.landlord_phone} onChange={handleChange} required color="gray" />
               <Input label="Email" name="landlord_email" type="email" value={formData.landlord_email} onChange={handleChange} color="gray" />

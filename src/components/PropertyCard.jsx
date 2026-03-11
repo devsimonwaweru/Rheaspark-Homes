@@ -1,16 +1,64 @@
+/* eslint-disable no-unused-vars */
 // src/components/PropertyCard.jsx
 import React, { useState, useMemo } from "react";
 
 export default function PropertyCard({ property, onViewDetails }) {
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [imgError, setImgError] = useState(false);
 
-  // Determine if we have a valid image URL
-  const hasImage = property.image && !imgError;
+  // Parse images from DB schema (images text null)
+  // Can be JSON string, Postgres array string, or fallback to image_url
+  const imageList = useMemo(() => {
+    let sources = [];
+    const rawData = property.images;
 
-  // Amenities parsing (robust)
+    if (rawData) {
+      try {
+        // 1. Try parsing as JSON (preferred for new uploads)
+        if (typeof rawData === 'string' && (rawData.startsWith('[') || rawData.startsWith('{'))) {
+          const parsed = JSON.parse(rawData);
+          if (Array.isArray(parsed)) sources = parsed;
+        } 
+        // 2. Handle Postgres array string format '{url1,url2}'
+        else if (typeof rawData === 'string' && rawData.startsWith('{') && rawData.endsWith('}')) {
+           // Simple regex to extract URLs inside curly braces
+           const matches = rawData.match(/https?:\/\/[^,}]+/g);
+           if (matches) sources = matches;
+        }
+      } catch (e) {
+        // Fallback if JSON parse fails but data exists
+        if (typeof rawData === 'string') sources = rawData.split(',').map(s => s.trim());
+      }
+    }
+
+    // Fallback to single image_url if no array found
+    if (sources.length === 0 && property.image_url) {
+      sources.push(property.image_url);
+    }
+    
+    // Legacy fallback
+    if (sources.length === 0 && property.image) {
+      sources.push(property.image);
+    }
+
+    return sources.filter(Boolean);
+  }, [property]);
+
+  const hasImage = imageList.length > 0 && !imgError;
+
+  const handleNext = (e) => {
+    e.stopPropagation(); // Prevent opening modal
+    setCurrentIndex((prev) => (prev + 1) % imageList.length);
+  };
+
+  const handlePrev = (e) => {
+    e.stopPropagation(); // Prevent opening modal
+    setCurrentIndex((prev) => (prev - 1 + imageList.length) % imageList.length);
+  };
+
+  // Amenities parsing
   const amenitiesList = useMemo(() => {
     let data = property.amenities;
-
     if (!data) return [];
     if (Array.isArray(data)) return data.filter((item) => item?.trim() !== "");
     if (typeof data === "string") {
@@ -24,17 +72,54 @@ export default function PropertyCard({ property, onViewDetails }) {
 
   return (
     <div className="bg-white rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100 flex flex-col group">
-      {/* Image Area */}
+      {/* Image Area / Carousel */}
       <div className="relative w-full h-56 bg-gray-100 overflow-hidden">
         {hasImage ? (
-          <img
-            src={property.image}
-            alt={property.title}
-            onError={() => setImgError(true)}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-          />
+          <>
+            <img
+              src={imageList[currentIndex]}
+              alt={`${property.title} - ${currentIndex + 1}`}
+              onError={() => setImgError(true)}
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            />
+            
+            {/* Carousel Controls (Only show if > 1 image) */}
+            {imageList.length > 1 && (
+              <>
+                {/* Previous Button */}
+                <button 
+                  onClick={handlePrev}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/70 hover:bg-white text-gray-700 p-1.5 rounded-full shadow-md transition-opacity opacity-0 group-hover:opacity-100"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+
+                {/* Next Button */}
+                <button 
+                  onClick={handleNext}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/70 hover:bg-white text-gray-700 p-1.5 rounded-full shadow-md transition-opacity opacity-0 group-hover:opacity-100"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+
+                {/* Dots Indicator */}
+                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5">
+                  {imageList.map((_, idx) => (
+                    <div 
+                      key={idx} 
+                      className={`w-1.5 h-1.5 rounded-full transition-colors ${idx === currentIndex ? 'bg-white' : 'bg-white/50'}`}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+          </>
         ) : (
-          // Visual Fallback when no image is available
+          // Visual Fallback
           <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 text-gray-400">
             <svg className="w-16 h-16 mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
