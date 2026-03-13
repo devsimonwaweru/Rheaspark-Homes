@@ -19,13 +19,13 @@ export default function Footer() {
             </p>
             {/* Social Icons */}
             <div className="flex space-x-3">
-              <a href="#" className="w-9 h-9 rounded-full bg-blue-800 flex items-center justify-center text-white hover:bg-primary-blue transition-colors">
+              <a href="https://www.facebook.com/Chicrhee" className="w-9 h-9 rounded-full bg-blue-800 flex items-center justify-center text-white hover:bg-primary-blue transition-colors">
                 <i className="fab fa-facebook-f text-sm"></i>
               </a>
-              <a href="#" className="w-9 h-9 rounded-full bg-blue-800 flex items-center justify-center text-white hover:bg-primary-blue transition-colors">
+              <a href="https://www.instagram.com/chicrhee" className="w-9 h-9 rounded-full bg-blue-800 flex items-center justify-center text-white hover:bg-primary-blue transition-colors">
                 <i className="fab fa-instagram text-sm"></i>
               </a>
-              <a href="#" className="w-9 h-9 rounded-full bg-blue-800 flex items-center justify-center text-white hover:bg-primary-blue transition-colors">
+              <a href="https://www.tiktok.com/@rhea..homes?_r=1&_t=ZS-94QbMtt27Ud" className="w-9 h-9 rounded-full bg-blue-800 flex items-center justify-center text-white hover:bg-primary-blue transition-colors">
                 <i className="fab fa-tiktok text-sm"></i>
               </a>
             </div>
