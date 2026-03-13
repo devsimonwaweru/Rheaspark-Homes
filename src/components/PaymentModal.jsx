@@ -45,7 +45,8 @@ export default function PaymentModal({ isOpen, onClose, amount, type, propertyId
         body: { 
           phone, 
           type, 
-          property_id: propertyId 
+          property_id: propertyId,
+          userId: session.user.id // <--- FIX: Added userId to body
         }
       });
 

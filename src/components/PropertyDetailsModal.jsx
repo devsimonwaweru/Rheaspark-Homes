@@ -40,7 +40,7 @@ export default function PropertyDetailsModal({ isOpen, onClose, property }) {
           .select("id")
           .eq("user_id", user.id)
           .eq("property_id", property.id)
-          .single();
+          .maybeSingle(); // <--- FIX: Changed from .single() to .maybeSingle()
         
         if (data) setHasAccess(true);
       }
@@ -151,7 +151,7 @@ export default function PropertyDetailsModal({ isOpen, onClose, property }) {
 
             {/* Actions */}
             <div className="pt-4 border-t space-y-3">
-              {/* Only show WhatsApp button if access is granted to prevent scraping phone numbers */}
+              {/* Only show WhatsApp button if access is granted */}
               {hasAccess && (
                 <a 
                   href={`https://wa.me/${property.landlord_phone}?text=Hi, I'm interested in your property on Rheaspark: ${property.title}`}
@@ -164,7 +164,7 @@ export default function PropertyDetailsModal({ isOpen, onClose, property }) {
                 </a>
               )}
 
-              {/* NEW: Cancel Button */}
+              {/* Cancel Button */}
               <button 
                 onClick={onClose}
                 className="w-full text-center text-gray-500 hover:text-gray-800 font-medium py-2 transition-colors"
