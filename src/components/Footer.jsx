@@ -67,7 +67,7 @@ export default function Footer() {
               </li>
               <li className="flex items-start text-sm text-gray-300">
                 <i className="fas fa-map-marker-alt text-primary-green mr-3 mt-1"></i>
-                Nairobi, Kenya
+                Meru, Kenya
               </li>
             </ul>
           </div>
