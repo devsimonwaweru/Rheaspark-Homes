@@ -8,19 +8,11 @@ export default function PropertyDetailsModal({ isOpen, onClose, property }) {
   const [loading, setLoading] = useState(true);
   const [showPayment, setShowPayment] = useState(false);
 
-  // --- Dynamic Pricing Logic ---
   const getUnlockPrice = (propertyType) => {
-    if (!propertyType) return 100; // Default fallback
-
+    if (!propertyType) return 100;
     const type = propertyType.toLowerCase();
-
-    // Single Room: 20 Bob
     if (type.includes("single")) return 20;
-
-    // Bedsitter: 30 Bob
     if (type.includes("bedsitter") || type.includes("studio")) return 30;
-
-    // 1 & 2 Bedroom (and default for larger): 100 Bob
     return 100;
   };
 
@@ -29,38 +21,40 @@ export default function PropertyDetailsModal({ isOpen, onClose, property }) {
   useEffect(() => {
     const checkAccess = async () => {
       if (!property) return;
-      
       setLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
 
       if (user) {
-        // Check if unlocked
         const { data } = await supabase
           .from("unlocks")
           .select("id")
           .eq("user_id", user.id)
           .eq("property_id", property.id)
-          .maybeSingle(); // <--- FIX: Changed from .single() to .maybeSingle()
+          .maybeSingle();
         
         if (data) setHasAccess(true);
       }
       
-      // Check if user is the landlord (owner)
       const { data: { user: currentUser } } = await supabase.auth.getUser();
       if (currentUser?.id === property.landlord_id) {
         setHasAccess(true);
       }
-
       setLoading(false);
     };
 
     if (isOpen) {
       checkAccess();
-      setHasAccess(false); // Reset on open
+      setHasAccess(false);
     }
   }, [isOpen, property]);
 
   if (!isOpen || !property) return null;
+
+  // Check if property has coordinates
+  const hasCoordinates = property.latitude && property.longitude;
+  const mapsUrl = hasCoordinates 
+    ? `https://www.google.com/maps/dir/?api=1&destination=${property.latitude},${property.longitude}` 
+    : '#';
 
   return (
     <>
@@ -69,21 +63,16 @@ export default function PropertyDetailsModal({ isOpen, onClose, property }) {
           
           {/* Image Header */}
           <div className="relative h-56 bg-gray-200">
-            {property.image ? (
-              <img src={property.image} className="w-full h-full object-cover" alt={property.title} />
+            {property.image_url ? (
+              <img src={property.image_url} className="w-full h-full object-cover" alt={property.title} />
             ) : (
               <div className="w-full h-full flex items-center justify-center bg-gray-100">
                 <span className="text-gray-400">No Image</span>
               </div>
             )}
-            <button 
-              onClick={onClose}
-              className="absolute top-4 right-4 bg-white/80 backdrop-blur-sm p-2 rounded-full shadow-lg hover:bg-white transition-colors"
-            >
+            <button onClick={onClose} className="absolute top-4 right-4 bg-white/80 backdrop-blur-sm p-2 rounded-full shadow-lg hover:bg-white transition-colors">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
             </button>
-            
-            {/* Badge */}
             <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-sm font-semibold text-blue-700">
               {property.type}
             </div>
@@ -103,10 +92,9 @@ export default function PropertyDetailsModal({ isOpen, onClose, property }) {
 
             <div className="border-t pt-4 space-y-3">
               <p className="text-gray-600 text-sm">{property.description}</p>
-              
               <div className="grid grid-cols-2 gap-3 text-sm">
-                 <div className="bg-gray-50 p-2 rounded-lg"><span className="text-gray-400 block">Bedrooms</span> <span className="font-semibold">{property.bedrooms || 0}</span></div>
-                 <div className="bg-gray-50 p-2 rounded-lg"><span className="text-gray-400 block">Bathrooms</span> <span className="font-semibold">{property.bathrooms || 0}</span></div>
+                <div className="bg-gray-50 p-2 rounded-lg"><span className="text-gray-400 block">Bedrooms</span> <span className="font-semibold">{property.bedrooms || 0}</span></div>
+                <div className="bg-gray-50 p-2 rounded-lg"><span className="text-gray-400 block">Bathrooms</span> <span className="font-semibold">{property.bathrooms || 0}</span></div>
               </div>
             </div>
 
@@ -115,13 +103,28 @@ export default function PropertyDetailsModal({ isOpen, onClose, property }) {
               {loading ? (
                 <div className="h-24 bg-gray-100 animate-pulse rounded-xl"></div>
               ) : hasAccess ? (
-                <div className="bg-green-50 border border-green-200 rounded-xl p-4 space-y-2">
-                  <h3 className="font-semibold text-green-800">Contact Landlord</h3>
-                  <div className="flex items-center space-x-2 text-green-900">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
-                    <a href={`tel:${property.landlord_phone}`} className="font-bold hover:underline">{property.landlord_phone}</a>
+                <div className="space-y-3">
+                  {/* Contact Info */}
+                  <div className="bg-green-50 border border-green-200 rounded-xl p-4 space-y-2">
+                    <h3 className="font-semibold text-green-800">Contact Landlord</h3>
+                    <div className="flex items-center space-x-2 text-green-900">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
+                      <a href={`tel:${property.landlord_phone}`} className="font-bold hover:underline">{property.landlord_phone}</a>
+                    </div>
                   </div>
-                  <p className="text-xs text-green-700 mt-1">You have unlocked this property.</p>
+
+                  {/* Directions Button (Premium Feature) */}
+                  {hasCoordinates && (
+                    <a 
+                      href={mapsUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full flex items-center justify-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition-colors shadow-sm"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" /></svg>
+                      <span>Get Directions</span>
+                    </a>
+                  )}
                 </div>
               ) : (
                 <div className="relative">
@@ -132,16 +135,18 @@ export default function PropertyDetailsModal({ isOpen, onClose, property }) {
                   </div>
                   
                   {/* Overlay */}
-                  <div className="absolute inset-0 bg-white/60 backdrop-blur-sm flex flex-col items-center justify-center rounded-xl border border-dashed border-blue-300">
-                    <svg className="w-8 h-8 text-blue-600 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
-                    <p className="text-sm font-semibold text-gray-800 mb-1">Unlock Contact Details</p>
-                    <p className="text-xs text-gray-500 mb-3">
-                      Fee: KES {unlockPrice} for {property.type}
-                    </p>
-                    <button 
-                      onClick={() => setShowPayment(true)}
-                      className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg text-sm shadow-md transition-colors"
-                    >
+                  <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center rounded-xl border border-dashed border-blue-300 p-4">
+                    <svg className="w-10 h-10 text-blue-600 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                    <p className="text-lg font-bold text-gray-800 mb-1">Unlock Premium Details</p>
+                    
+                    {/* NEW: Benefits List */}
+                    <div className="text-xs text-gray-600 mb-4 space-y-1 text-left w-full px-4">
+                       <div className="flex items-center"><svg className="w-3 h-3 mr-2 text-green-500" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>View Landlord Phone Number</div>
+                       <div className="flex items-center"><svg className="w-3 h-3 mr-2 text-green-500" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>Exact GPS Directions</div>
+                       <div className="flex items-center"><svg className="w-3 h-3 mr-2 text-green-500" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>WhatsApp Direct Chat</div>
+                    </div>
+
+                    <button onClick={() => setShowPayment(true)} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-8 rounded-lg text-sm shadow-md transition-colors">
                       Unlock for KES {unlockPrice}
                     </button>
                   </div>
@@ -151,10 +156,9 @@ export default function PropertyDetailsModal({ isOpen, onClose, property }) {
 
             {/* Actions */}
             <div className="pt-4 border-t space-y-3">
-              {/* Only show WhatsApp button if access is granted */}
               {hasAccess && (
                 <a 
-                  href={`https://wa.me/${property.landlord_phone}?text=Hi, I'm interested in your property on Rheaspark: ${property.title}`}
+                  href={`https://wa.me/${property.landlord_phone}?text=Hi, I'm interested in your property: ${property.title}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="w-full flex items-center justify-center space-x-2 bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-xl transition-colors"
@@ -163,12 +167,7 @@ export default function PropertyDetailsModal({ isOpen, onClose, property }) {
                   <span>Chat on WhatsApp</span>
                 </a>
               )}
-
-              {/* Cancel Button */}
-              <button 
-                onClick={onClose}
-                className="w-full text-center text-gray-500 hover:text-gray-800 font-medium py-2 transition-colors"
-              >
+              <button onClick={onClose} className="w-full text-center text-gray-500 hover:text-gray-800 font-medium py-2 transition-colors">
                 Cancel
               </button>
             </div>
@@ -176,14 +175,11 @@ export default function PropertyDetailsModal({ isOpen, onClose, property }) {
         </div>
       </div>
 
-      {/* Payment Modal */}
       <PaymentModal 
         isOpen={showPayment}
         onClose={(success) => {
           setShowPayment(false);
-          if (success) {
-            setHasAccess(true);
-          }
+          if (success) setHasAccess(true);
         }}
         amount={unlockPrice} 
         type="view_property" 
