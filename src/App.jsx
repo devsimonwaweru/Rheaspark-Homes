@@ -1,6 +1,7 @@
 // src/App.jsx
 import React, { useEffect, useState } from "react";
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+// CHANGE: Import HashRouter instead of BrowserRouter
+import { HashRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { supabase } from "./lib/supabaseClient";
 
 // Components
@@ -29,7 +30,7 @@ import MoverHome from "./pages/MoverHome";
 import MoverJobs from "./pages/MoverJobs";
 
 // Admin Pages
-import AdminLogin from "./pages/AdminLogin"; // Dedicated Admin Login
+import AdminLogin from "./pages/AdminLogin";
 import AdminLayout from "./pages/AdminLayout";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminUsers from "./pages/AdminUsers";
@@ -97,11 +98,9 @@ function App() {
         />
 
         {/* ==================== ADMIN LOGIN (Standalone) ==================== */}
-        {/* This is the hidden link route from the footer */}
         <Route path="/admin/login" element={<AdminLogin />} />
 
         {/* ==================== ADMIN PROTECTED ROUTES ==================== */}
-        {/* If user is NOT logged in, redirect to Admin Login. If logged in, show Layout. */}
         <Route 
           path="/admin/*" 
           element={session ? <AdminLayout /> : <Navigate to="/admin/login" replace />} 
