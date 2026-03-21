@@ -14,6 +14,7 @@ export default function FindHouses() {
 
   // --- Filter State ---
   const [filters, setFilters] = useState({
+    searchQuery: "", // NEW: State for name/location search
     minPrice: 1000,
     maxPrice: 10000,
     type: "All",
@@ -91,17 +92,25 @@ export default function FindHouses() {
   };
 
   const filteredProperties = properties.filter((p) => {
-    // 1. Price Filter
+    // 1. Search Query Filter (Checks Title & Location)
+    if (filters.searchQuery) {
+      const query = filters.searchQuery.toLowerCase();
+      const titleMatch = p.title?.toLowerCase().includes(query);
+      const locationMatch = p.location?.toLowerCase().includes(query);
+      if (!titleMatch && !locationMatch) return false;
+    }
+
+    // 2. Price Filter
     const price = parseFloat(p.price);
     if (price < filters.minPrice || price > filters.maxPrice) return false;
 
-    // 2. Type Filter
+    // 3. Type Filter
     if (filters.type !== "All" && p.type !== filters.type) return false;
 
-    // 3. Bedrooms Filter
+    // 4. Bedrooms Filter
     if (filters.bedrooms !== "Any" && p.bedrooms < parseInt(filters.bedrooms)) return false;
 
-    // 4. Bathrooms Filter
+    // 5. Bathrooms Filter
     if (filters.bathrooms !== "Any" && p.bathrooms < parseInt(filters.bathrooms)) return false;
 
     return true;
@@ -134,7 +143,24 @@ export default function FindHouses() {
         </div>
 
         {/* --- Updated Filter UI --- */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 mb-8">
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 mb-8 space-y-4">
+          
+          {/* Search Bar */}
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+              <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+            </div>
+            <input
+              type="text"
+              name="searchQuery"
+              value={filters.searchQuery}
+              onChange={handleFilterChange}
+              placeholder="Search by name or location (e.g. Modern Studio, Kilimani)"
+              className="w-full pl-11 pr-4 py-3 border-2 border-gray-200 rounded-xl text-gray-800 focus:border-blue-500 focus:ring-0 outline-none transition-colors"
+            />
+          </div>
+
+          {/* Filter Grid */}
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
             
             {/* Price Range */}
@@ -230,7 +256,7 @@ export default function FindHouses() {
           <div className="text-center py-20 bg-white rounded-2xl border border-gray-100">
             <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
             <h3 className="text-lg font-semibold text-gray-700">No properties found</h3>
-            <p className="text-gray-400 text-sm">Try adjusting your filters.</p>
+            <p className="text-gray-400 text-sm">Try adjusting your search or filters.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -254,4 +280,4 @@ export default function FindHouses() {
       </div>
     </div>
   );
-}
+} 
