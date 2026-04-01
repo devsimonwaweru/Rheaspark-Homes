@@ -7,6 +7,7 @@ export default function Register() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
+  const [phone, setPhone] = useState('');
   const [role, setRole] = useState('user');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -37,25 +38,42 @@ export default function Register() {
       if (authError) throw authError;
       const userId = authData.user.id;
 
+      // Prepare base data object
+      // business_name is required in your schema for landlords/movers, defaulting to fullName
+      const baseData = { 
+        id: userId, 
+        full_name: fullName, 
+        phone: phone 
+      };
+
       if (role === "landlord") {
-        // 2. Insert Landlord
+        // 2. Insert Landlord (includes email)
         const { error: landlordError } = await supabase
           .from("landlords")
           .insert([
-            { id: userId, full_name: fullName, business_name: fullName, email: email }
+            { ...baseData, business_name: fullName, email: email }
           ]);
 
         if (landlordError) throw landlordError;
-        
-        // 3. Redirect to Subscription Page
         navigate("/subscription");
 
+      } else if (role === "mover") {
+        // 3. Insert Mover (schema has no email column)
+        const { error: moverError } = await supabase
+          .from("movers")
+          .insert([
+            { ...baseData, business_name: fullName }
+          ]);
+
+        if (moverError) throw moverError;
+        navigate("/mover/dashboard");
+
       } else {
-        // Normal User Flow
+        // 4. Insert User (includes email)
         const { error: userError } = await supabase
           .from("users")
           .insert([
-            { id: userId, full_name: fullName, email: email }
+            { ...baseData, email: email }
           ]);
 
         if (userError) throw userError;
@@ -94,7 +112,7 @@ export default function Register() {
             Join Rheaspark<br /> Today
           </h1>
           <p className="text-lg text-emerald-100 mb-8 max-w-md">
-            Create an account to list your properties or find your perfect home with ease.
+            Create an account to list your properties, offer moving services, or find your perfect home.
           </p>
         </div>
       </div>
@@ -126,6 +144,18 @@ export default function Register() {
                 className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition shadow-sm"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Active Phone Number</label>
+              <input
+                type="tel"
+                placeholder="e.g. +2547XXXXXXXX"
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition shadow-sm"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
                 required
               />
             </div>
@@ -172,6 +202,7 @@ export default function Register() {
               >
                 <option value="user">User (Tenant)</option>
                 <option value="landlord">Landlord</option>
+                <option value="mover">Mover</option>
               </select>
             </div>
 

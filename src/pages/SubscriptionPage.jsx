@@ -9,7 +9,7 @@ export default function SubscriptionPage() {
   const [processing, setProcessing] = useState(false);
   const [phone, setPhone] = useState('');
   const [error, setError] = useState(null);
-  const [paymentId, setPaymentId] = useState(null); // Store current payment ID
+  const [paymentId, setPaymentId] = useState(null); 
 
   useEffect(() => {
     const checkUser = async () => {
@@ -53,7 +53,7 @@ export default function SubscriptionPage() {
           },
           body: JSON.stringify({ 
             phone: phone, 
-            type: 'subscription',
+            type: 'subscription', // Ensure your backend handles this 'subscription' type as the Yearly plan
             userId: user.id 
           }),
         }
@@ -66,7 +66,7 @@ export default function SubscriptionPage() {
       }
 
       alert("STK Push sent! Please check your phone.");
-      setPaymentId(data.payment_id); // Save ID for manual check
+      setPaymentId(data.payment_id); 
       pollPaymentStatus(data.payment_id);
 
     } catch (err) {
@@ -101,7 +101,6 @@ export default function SubscriptionPage() {
         } else if (attempts >= maxAttempts) {
           clearInterval(interval);
           setError("Automatic check timed out. Use button below if you paid.");
-          // Don't stop processing entirely, let them click manual button
         }
       } catch (e) { 
         console.error("Polling error:", e); 
@@ -150,9 +149,12 @@ export default function SubscriptionPage() {
         </div>
 
         <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+          {/* Updated Header for Yearly Plan */}
           <div className="p-6 bg-gradient-to-r from-blue-600 to-emerald-500 text-white text-center">
-            <p className="text-sm uppercase tracking-wider opacity-80">Landlord Plan</p>
-            <h2 className="text-4xl font-bold my-2">KES 50<span className="text-lg font-normal">/mo</span></h2>
+            <p className="text-sm uppercase tracking-wider opacity-80">Landlord Yearly Plan</p>
+            {/* Changed Price to 549/yr */}
+            <h2 className="text-4xl font-bold my-2">KES 549<span className="text-lg font-normal">/yr</span></h2>
+            <p className="text-xs opacity-75 mt-1">One-time annual payment</p>
           </div>
 
           <div className="p-6 space-y-4">
@@ -160,6 +162,10 @@ export default function SubscriptionPage() {
               <li className="flex items-center text-gray-700">
                 <svg className="w-5 h-5 mr-3 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>
                 Post unlimited properties
+              </li>
+              <li className="flex items-center text-gray-700">
+                <svg className="w-5 h-5 mr-3 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>
+                Verified badge & priority support
               </li>
             </ul>
 
@@ -182,10 +188,9 @@ export default function SubscriptionPage() {
               disabled={processing}
               className="w-full mt-4 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl shadow-lg transition-all disabled:opacity-50 flex items-center justify-center"
             >
-              {processing ? "Processing..." : "Pay & Activate"}
+              {processing ? "Processing..." : "Pay KES 549"}
             </button>
 
-            {/* MANUAL CHECK BUTTON - ONLY SHOWS WHEN PROCESSING */}
             {processing && (
               <button
                 onClick={handleManualCheck}

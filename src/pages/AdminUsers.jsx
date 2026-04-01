@@ -5,6 +5,9 @@ import { supabase } from '../lib/supabaseClient';
 const AdminUsers = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
+  const [formData, setFormData] = useState({});
 
   useEffect(() => {
     fetchUsers();
@@ -12,11 +15,9 @@ const AdminUsers = () => {
 
   const fetchUsers = async () => {
     try {
-      // Fetch specific columns: full_name, phone, email, created_at
-      // Excluding: id, avatar_url
       const { data, error } = await supabase
         .from('users')
-        .select('full_name, phone, email, created_at')
+        .select('id, full_name, phone, email, avatar_url, created_at')
         .order('created_at', { ascending: false });
         
       if (error) throw error;
@@ -25,6 +26,55 @@ const AdminUsers = () => {
       console.error("Error fetching users:", error.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this user? This will remove their profile data.")) return;
+
+    try {
+      const { error } = await supabase.from('users').delete().eq('id', id);
+      if (error) throw error;
+      setUsers(users.filter(u => u.id !== id));
+    } catch (error) {
+      console.error("Error deleting user:", error.message);
+      alert("Failed to delete user.");
+    }
+  };
+
+  const openEditModal = (user) => {
+    setEditingUser(user);
+    setFormData({
+      full_name: user.full_name,
+      phone: user.phone || '',
+      // Email is typically read-only in auth systems, but editable in the public table for display
+      email: user.email || '', 
+    });
+    setIsEditModalOpen(true);
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleUpdate = async (e) => {
+    e.preventDefault();
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update(formData)
+        .eq('id', editingUser.id);
+
+      if (error) throw error;
+      
+      // Update local state
+      setUsers(users.map(u => u.id === editingUser.id ? { ...u, ...formData } : u));
+      setIsEditModalOpen(false);
+      setEditingUser(null);
+    } catch (error) {
+      console.error("Error updating user:", error.message);
+      alert("Failed to update user.");
     }
   };
 
@@ -50,15 +100,20 @@ const AdminUsers = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Joined</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {users.map((user, index) => (
-                <tr key={user.email || index} className="hover:bg-gray-50 transition-colors">
+              {users.map((user) => (
+                <tr key={user.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
-                      <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mr-3">
-                        <i className="fas fa-user text-gray-400"></i>
+                      <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mr-3 overflow-hidden">
+                        {user.avatar_url ? (
+                          <img src={user.avatar_url} alt={user.full_name} className="w-full h-full object-cover" />
+                        ) : (
+                          <i className="fas fa-user text-gray-400"></i>
+                        )}
                       </div>
                       <div className="font-medium text-gray-900">
                         {user.full_name || 'No Name Provided'}
@@ -74,6 +129,20 @@ const AdminUsers = () => {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {new Date(user.created_at).toLocaleDateString()}
                   </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                    <button 
+                      onClick={() => openEditModal(user)}
+                      className="text-blue-600 hover:text-blue-900 bg-blue-50 px-3 py-1 rounded-lg"
+                    >
+                      Edit
+                    </button>
+                    <button 
+                      onClick={() => handleDelete(user.id)}
+                      className="text-red-600 hover:text-red-900 bg-red-50 px-3 py-1 rounded-lg"
+                    >
+                      Delete
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -85,6 +154,57 @@ const AdminUsers = () => {
           )}
         </div>
       </div>
+
+      {/* Edit Modal */}
+      {isEditModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+            <div className="p-6 border-b border-gray-100">
+              <h2 className="text-xl font-bold text-gray-800">Edit User</h2>
+            </div>
+            <form onSubmit={handleUpdate} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                <input 
+                  type="text" name="full_name" value={formData.full_name || ''} onChange={handleInputChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
+                <input 
+                  type="tel" name="phone" value={formData.phone || ''} onChange={handleInputChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+                <input 
+                  type="email" name="email" value={formData.email || ''} onChange={handleInputChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50"
+                  readOnly // usually safer to keep email read-only in public table edits
+                />
+              </div>
+              <div className="flex justify-end space-x-3 pt-4">
+                <button 
+                  type="button" 
+                  onClick={() => setIsEditModalOpen(false)} 
+                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit" 
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
