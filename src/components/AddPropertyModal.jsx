@@ -2,6 +2,11 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "../lib/supabaseClient";
 
+// --- Sanity Configuration ---
+const SANITY_PROJECT_ID = import.meta.env.VITE_SANITY_PROJECT_ID;
+const SANITY_DATASET = import.meta.env.VITE_SANITY_DATASET || "production";
+const SANITY_TOKEN = import.meta.env.VITE_SANITY_TOKEN || "";
+
 // --- Components ---
 
 const Input = ({ label, name, value, onChange, type = "text", placeholder, required, color = "blue" }) => {
@@ -54,9 +59,9 @@ const Select = ({ label, name, value, onChange, options, color = "blue" }) => {
 export default function AddPropertyModal({ isOpen, onClose }) {
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState(1);
-  const [gpsStatus, setGpsStatus] = useState("idle"); // idle, loading, success, error
+  const [gpsStatus, setGpsStatus] = useState("idle");
   
-  const [imageFiles, setImageFiles] = useState([null, null, null]);
+  const [imageFiles, setImageFiles] = useState([]);
 
   const [formData, setFormData] = useState({
     title: "", type: "Apartment", description: "",
@@ -117,25 +122,33 @@ export default function AddPropertyModal({ isOpen, onClose }) {
     );
   };
 
-  // Handle individual file input change
-  const handleImageChange = (index, file) => {
-    if (!file) return;
-    const preview = URL.createObjectURL(file);
-    
-    setImageFiles(prev => {
-      const newFiles = [...prev];
-      if (newFiles[index]?.preview) URL.revokeObjectURL(newFiles[index].preview);
-      newFiles[index] = { file, preview };
-      return newFiles;
-    });
+  const handleImageChange = (e) => {
+    const files = Array.from(e.target.files);
+    if (!files.length) return;
+
+    const currentCount = imageFiles.length;
+    const availableSlots = 5 - currentCount;
+
+    if (files.length > availableSlots) {
+      alert(`You can only upload ${availableSlots} more image(s). Limit is 5.`);
+    }
+
+    const filesToAdd = files.slice(0, availableSlots);
+
+    const newFilesWithPreview = filesToAdd.map(file => ({
+      file,
+      preview: URL.createObjectURL(file)
+    }));
+
+    setImageFiles(prev => [...prev, ...newFilesWithPreview]);
+    e.target.value = null;
   };
 
-  // Remove image
   const removeImage = (index) => {
     setImageFiles(prev => {
       const newFiles = [...prev];
       if (newFiles[index]?.preview) URL.revokeObjectURL(newFiles[index].preview);
-      newFiles[index] = null;
+      newFiles.splice(index, 1);
       return newFiles;
     });
   };
@@ -143,24 +156,48 @@ export default function AddPropertyModal({ isOpen, onClose }) {
   const nextStep = () => setStep(prev => prev + 1);
   const prevStep = () => setStep(prev => prev - 1);
 
+  // --- ULTRA-ROBUST Sanity Upload (Binary Method) ---
+  const uploadToSanity = async (file) => {
+    // 1. URL for Binary Upload
+    const url = `https://${SANITY_PROJECT_ID}.api.sanity.io/v2021-06-07/assets/images/${SANITY_DATASET}`;
+    
+    // 2. Send Raw File as Body (No FormData)
+    // This fixes the "Invalid Image" / 422 error
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Authorization': `Bearer ${SANITY_TOKEN}`,
+        'Content-Type': file.type // Explicitly set image mime type
+      },
+      body: file // Send the file object directly
+    });
+
+    // 3. Handle Response
+    if (!response.ok) {
+      const errData = await response.json().catch(() => ({}));
+      console.error("Sanity Error:", errData);
+      throw new Error(errData.error?.description || "Upload failed");
+    }
+
+    const result = await response.json();
+    
+    // Sanity returns the document in `result.document` or directly
+    const asset = result.document || result;
+    
+    // Return the secure URL
+    return asset.url;
+  };
+
   const handleSubmit = async () => {
-    const validImages = imageFiles.filter(Boolean);
-    if (validImages.length === 0) return alert("Please upload at least one property image");
+    if (imageFiles.length === 0) return alert("Please upload at least one property image");
     
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      const uploadPromises = validImages.map(async (imgObj, idx) => {
-        const file = imgObj.file;
-        const fileName = `prop-${Date.now()}-${idx}-${file.name.replace(/\s/g, "-")}`;
-        const { error: uploadError } = await supabase.storage.from("property-images").upload(fileName, file);
-        if (uploadError) throw uploadError;
-        const { data: urlData } = supabase.storage.from("property-images").getPublicUrl(fileName);
-        return urlData.publicUrl;
-      });
-
+      const uploadPromises = imageFiles.map((imgObj) => uploadToSanity(imgObj.file));
       const imageUrls = await Promise.all(uploadPromises);
 
       const propertyData = {
@@ -170,8 +207,8 @@ export default function AddPropertyModal({ isOpen, onClose }) {
         security_deposit: parseFloat(formData.security_deposit || 0),
         bedrooms: parseInt(formData.bedrooms),
         bathrooms: parseInt(formData.bathrooms),
-        image_url: imageUrls[0],
-        images: JSON.stringify(imageUrls),
+        image_url: imageUrls[0], 
+        images: JSON.stringify(imageUrls), 
         amenities: amenities,
         status: "active",
         latitude: formData.latitude ? parseFloat(formData.latitude) : null,
@@ -224,7 +261,6 @@ export default function AddPropertyModal({ isOpen, onClose }) {
               <Select label="Parking" name="parking" value={formData.parking} onChange={handleChange} options={["None", "Shared", "1 Dedicated", "2+"]} color="green" />
             </div>
             
-            {/* GPS Section */}
             <div className="pt-2">
               <label className="block text-sm font-semibold text-gray-700 mb-1.5">Exact Location (Optional)</label>
               <button type="button" onClick={handleGetLocation} disabled={gpsStatus === "loading"} className={`w-full flex items-center justify-center space-x-2 py-3 px-4 rounded-xl border-2 transition-all font-medium ${gpsStatus === "success" ? "bg-green-50 border-green-400 text-green-700" : "bg-white border-gray-200 text-gray-600 hover:border-blue-400 hover:text-blue-600"}`}>
@@ -237,7 +273,6 @@ export default function AddPropertyModal({ isOpen, onClose }) {
                   )}
                   <span>{gpsStatus === "loading" ? "Capturing..." : gpsStatus === "success" ? "Location Captured" : "Use Current Location"}</span>
               </button>
-              {gpsStatus === "success" && <p className="text-xs text-gray-500 mt-1.5 text-center">Coordinates saved successfully</p>}
             </div>
 
             <div className="pt-4">
@@ -279,44 +314,42 @@ export default function AddPropertyModal({ isOpen, onClose }) {
       case 4: 
         return (
           <div className="space-y-5 animate-fade-in">
-            <h3 className="text-xl font-bold text-gray-800 mb-2">Media (Max 3 Images)</h3>
+            <h3 className="text-xl font-bold text-gray-800 mb-2">Media (Max 5 Images)</h3>
             
-            {/* FIXED: Updated Grid Logic for Better Upload Flow */}
             <div className="grid grid-cols-3 gap-3">
-              {[0, 1, 2].map((index) => (
+              {imageFiles.map((img, index) => (
                 <div key={index} className="relative aspect-square group">
-                  <div className="w-full h-full border-2 border-dashed border-blue-300 rounded-xl p-1 hover:border-blue-500 transition-colors bg-blue-50/50 flex items-center justify-center overflow-hidden relative">
-                    
-                    {imageFiles[index]?.preview ? (
-                      <>
-                        <img src={imageFiles[index].preview} alt={`Preview ${index}`} className="w-full h-full object-cover rounded-lg" />
-                        {/* Remove button sits on top with high z-index */}
-                        <button 
-                          type="button"
-                          onClick={() => removeImage(index)}
-                          className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-md z-20"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <div className="text-center text-blue-400 pointer-events-none">
-                          <svg className="w-6 h-6 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                          <p className="text-xs font-medium">Image {index + 1}</p>
-                        </div>
-                        {/* Input only covers empty slots */}
-                        <input 
-                          type="file" 
-                          accept="image/*" 
-                          onChange={(e) => handleImageChange(index, e.target.files[0])} 
-                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
-                        />
-                      </>
-                    )}
+                  <div className="w-full h-full border-2 border-blue-300 rounded-xl p-1 bg-blue-50/50 flex items-center justify-center overflow-hidden relative">
+                    <img src={img.preview} alt={`Preview ${index}`} className="w-full h-full object-cover rounded-lg" />
+                    <button 
+                      type="button"
+                      onClick={() => removeImage(index)}
+                      className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-md z-20"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
                   </div>
                 </div>
               ))}
+
+              {imageFiles.length < 5 && (
+                <div className="relative aspect-square group">
+                  <div className="w-full h-full border-2 border-dashed border-blue-300 rounded-xl p-1 hover:border-blue-500 transition-colors bg-blue-50/50 flex items-center justify-center overflow-hidden relative cursor-pointer">
+                    <div className="text-center text-blue-400 pointer-events-none">
+                      <svg className="w-6 h-6 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                      <p className="text-xs font-medium">Add Photos</p>
+                      <p className="text-[10px] text-gray-400">{5 - imageFiles.length} left</p>
+                    </div>
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      multiple
+                      onChange={handleImageChange} 
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 pt-4 border-t border-gray-100 mt-6">
@@ -384,7 +417,7 @@ export default function AddPropertyModal({ isOpen, onClose }) {
         </div>
       </div>
       
-      <style jsx>{`
+      <style>{`
         @keyframes scale-in { 0% { transform: scale(0.95); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
         @keyframes fade-in { 0% { opacity: 0; transform: translateX(10px); } 100% { opacity: 1; transform: translateX(0); } }
         .animate-scale-in { animation: scale-in 0.2s ease-out forwards; }
