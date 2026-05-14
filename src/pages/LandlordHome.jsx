@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { useOutletContext } from 'react-router-dom';
+import EditPropertyModal from '../components/EditPropertyModal';
 
 export default function LandlordHome() {
   const { openAddPropertyModal } = useOutletContext();
@@ -13,17 +14,13 @@ export default function LandlordHome() {
   
   // Edit State
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [editData, setEditData] = useState(null);
+  const [selectedProperty, setSelectedProperty] = useState(null);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/immutability
     loadData();
-    
-    // Listen for updates when a new property is added via the modal
-    const channel = supabase.channel('realtime-properties')
+    const channel = supabase.channel('realtime-landlord-properties')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'properties' }, () => loadData())
       .subscribe();
-
     return () => { supabase.removeChannel(channel); };
   }, []);
 
@@ -45,49 +42,85 @@ export default function LandlordHome() {
     setLoading(false);
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Delete this property permanently?")) return;
-    
-    await supabase.from('properties').delete().eq('id', id);
-    setProperties(properties.filter(p => p.id !== id));
-  };
+  // --- ROBUST DELETE LOGIC ---
+  const handleDelete = async (property) => {
+    // 1. Initial Confirmation
+    const confirmProp = window.confirm(`Are you sure you want to delete "${property.title}"?`);
+    if (!confirmProp) return;
 
-  const openEdit = (property) => {
-    setEditData({ ...property });
-    setIsEditModalOpen(true);
-  };
+    try {
+      // 2. Check for Constraints (Unlocks)
+      // We check if any user has unlocked this property.
+      const { data: unlocks, error: unlockCheckError } = await supabase
+        .from('unlocks')
+        .select('id')
+        .eq('property_id', property.id);
 
-  const handleEditChange = (e) => {
-    const { name, value } = e.target;
-    setEditData(prev => ({ ...prev, [name]: value }));
-  };
+      if (unlockCheckError) throw unlockCheckError;
 
-  const handleUpdate = async (e) => {
-    e.preventDefault();
-    const { id, created_at, landlord_id, ...updateData } = editData; // Exclude non-updatable fields
-    
-    const { error } = await supabase
-      .from('properties')
-      .update(updateData)
-      .eq('id', id);
+      // 3. Handle Constraint Logic
+      if (unlocks && unlocks.length > 0) {
+        const confirmUnlockDelete = window.confirm(
+          `This property has ${unlocks.length} unlock record(s). Database constraints require deleting these first.\n\n` +
+          `Do you want to DELETE the property AND its unlock history?\n\n` +
+          `(Click 'Cancel' to keep the property)`
+        );
 
-    if (!error) {
-      setProperties(properties.map(p => p.id === id ? editData : p));
-      setIsEditModalOpen(false);
-    } else {
-      alert("Error updating property: " + error.message);
+        if (confirmUnlockDelete) {
+          // Delete unlocks first
+          const { error: deleteUnlockError } = await supabase
+            .from('unlocks')
+            .delete()
+            .eq('property_id', property.id);
+          
+          if (deleteUnlockError) throw deleteUnlockError;
+        } else {
+          alert("Deletion cancelled. Property preserved.");
+          return;
+        }
+      }
+
+      // 4. Delete Property
+      const { error: deletePropError } = await supabase
+        .from('properties')
+        .delete()
+        .eq('id', property.id);
+
+      if (deletePropError) throw deletePropError;
+
+      // Update UI
+      setProperties(properties.filter(p => p.id !== property.id));
+      alert("Property deleted successfully.");
+
+    } catch (err) {
+      console.error(err);
+      alert("Failed to delete: " + err.message);
     }
   };
 
+  const openEdit = (property) => {
+    setSelectedProperty(property);
+    setIsEditModalOpen(true);
+  };
+
+  const handleSave = (updatedData) => {
+    setProperties(properties.map(p => p.id === selectedProperty.id ? { ...p, ...updatedData } : p));
+  };
+
   const toggleStatus = async (property) => {
+    // Optimistic UI update
     const newStatus = property.status === 'active' ? 'inactive' : 'active';
+    setProperties(properties.map(p => p.id === property.id ? { ...p, status: newStatus } : p));
+
     const { error } = await supabase
       .from('properties')
       .update({ status: newStatus })
       .eq('id', property.id);
     
-    if (!error) {
-      setProperties(properties.map(p => p.id === property.id ? { ...p, status: newStatus } : p));
+    if (error) {
+      // Revert on error
+      setProperties(properties.map(p => p.id === property.id ? { ...p, status: property.status } : p));
+      alert("Failed to update status: " + error.message);
     }
   };
 
@@ -105,7 +138,7 @@ export default function LandlordHome() {
   return (
     <div className="p-4 md:p-8 relative">
       
-      {/* Welcome Header */}
+      {/* Header */}
       <div className="bg-gradient-to-r from-blue-900 to-blue-800 rounded-2xl p-8 text-white shadow-xl mb-8">
         <h1 className="text-3xl font-bold mb-2">
           Welcome back, {profile?.full_name?.split(' ')[0] || 'Landlord'}!
@@ -113,7 +146,7 @@ export default function LandlordHome() {
         <p className="text-blue-100">Manage your properties and track performance.</p>
       </div>
 
-      {/* Top Actions */}
+      {/* Actions */}
       <div className="flex justify-between items-center mb-8">
         <h2 className="text-xl font-bold text-gray-800">Overview</h2>
         <button 
@@ -125,7 +158,7 @@ export default function LandlordHome() {
         </button>
       </div>
 
-      {/* Stats Grid */}
+      {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <h3 className="text-3xl font-bold text-gray-800 mb-1">{totalListed}</h3>
@@ -141,7 +174,7 @@ export default function LandlordHome() {
         </div>
       </div>
 
-      {/* Properties List */}
+      {/* Properties Grid */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <h3 className="text-lg font-bold text-gray-800 mb-4">Your Properties</h3>
         
@@ -177,7 +210,7 @@ export default function LandlordHome() {
                        <button onClick={() => toggleStatus(p)} className={`text-xs font-semibold px-2 py-1 rounded ${p.status === 'active' ? 'text-orange-600 hover:bg-orange-50' : 'text-green-600 hover:bg-green-50'}`}>
                          {p.status === 'active' ? 'Deactivate' : 'Republish'}
                        </button>
-                       <button onClick={() => handleDelete(p.id)} className="text-xs font-semibold text-red-600 hover:bg-red-50 px-2 py-1 rounded">Delete</button>
+                       <button onClick={() => handleDelete(p)} className="text-xs font-semibold text-red-600 hover:bg-red-50 px-2 py-1 rounded">Delete</button>
                      </div>
                   </div>
                 </div>
@@ -188,49 +221,12 @@ export default function LandlordHome() {
       </div>
 
       {/* Edit Modal */}
-      {isEditModalOpen && editData && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-100 sticky top-0 bg-white z-10">
-              <h2 className="text-xl font-bold text-gray-800">Edit Property</h2>
-            </div>
-            <form onSubmit={handleUpdate} className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
-                <input name="title" value={editData.title || ''} onChange={handleEditChange} className="w-full px-4 py-2 border rounded-lg" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
-                <input name="location" value={editData.location || ''} onChange={handleEditChange} className="w-full px-4 py-2 border rounded-lg" />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Price</label>
-                  <input type="number" name="price" value={editData.price || ''} onChange={handleEditChange} className="w-full px-4 py-2 border rounded-lg" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
-                  <select name="type" value={editData.type || ''} onChange={handleEditChange} className="w-full px-4 py-2 border rounded-lg">
-                    <option>Apartment</option>
-                    <option>House</option>
-                    <option>Studio</option>
-                    <option>Bedsitter</option>
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                <textarea name="description" value={editData.description || ''} onChange={handleEditChange} rows="3" className="w-full px-4 py-2 border rounded-lg" />
-              </div>
-              
-              <div className="flex justify-end space-x-3 pt-4">
-                <button type="button" onClick={() => setIsEditModalOpen(false)} className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium">Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">Update Property</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <EditPropertyModal 
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        property={selectedProperty}
+        onSave={handleSave}
+      />
     </div>
   );
 }
