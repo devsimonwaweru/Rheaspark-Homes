@@ -2,7 +2,7 @@
 // src/pages/AdminProperties.jsx
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
-import EditPropertyModal from '../components/EditPropertyModal'; // Import the new modal
+import EditPropertyModal from '../components/EditPropertyModal';
 
 const AdminProperties = () => {
   const [properties, setProperties] = useState([]);
@@ -10,54 +10,103 @@ const AdminProperties = () => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState(null);
 
-  useEffect(() => { fetchProperties(); }, []);
+  useEffect(() => { 
+    fetchProperties(); 
+  }, []);
 
   const fetchProperties = async () => {
     try {
+      console.log("Fetching properties...");
       const { data, error } = await supabase
         .from('properties')
         .select('*')
         .order('created_at', { ascending: false });
         
       if (error) throw error;
+      
+      console.log("Fetched properties:", data);
       setProperties(data || []);
     } catch (error) {
       console.error("Error fetching properties:", error.message);
+      alert("Failed to fetch properties: " + error.message);
     } finally {
       setLoading(false);
     }
   };
 
-  // UPDATED DELETE LOGIC
+  // UPDATED: Toggle Featured Status with Advanced Logging
+  const toggleFeatured = async (property) => {
+    // 1. Check ID
+    if (!property.id) {
+      alert("Error: This property is missing an ID.");
+      console.error("Missing ID", property);
+      return;
+    }
+
+    const newStatus = property.featured === 'true' ? 'false' : 'true';
+    console.log(`Attempting update: ID ${property.id} to featured: ${newStatus}`);
+
+    try {
+      // 2. Attempt Update
+      const { data, error } = await supabase
+        .from('properties')
+        .update({ featured: newStatus })
+        .eq('id', property.id)
+        .select(); // Request the updated data back
+
+      // 3. Log Raw Response
+      console.log("Supabase Response:", { data, error });
+
+      // 4. Handle Errors
+      if (error) {
+        alert("Database Error: " + error.message);
+        return;
+      }
+
+      // 5. Handle Empty Data (Indicates RLS or wrong ID)
+      if (!data || data.length === 0) {
+        alert("Update failed: Database returned no data. Check if RLS is blocking the write.");
+        console.warn("No data returned. Check RLS policies or if ID exists in DB.");
+        return;
+      }
+
+      // 6. Success: Update UI
+      setProperties(prev => prev.map(p => 
+        p.id === property.id ? { ...p, featured: newStatus } : p
+      ));
+      
+      console.log("UI State Updated Successfully");
+
+    } catch (err) {
+      console.error("Network/Catch Error:", err);
+      alert("Network Error: " + err.message);
+    }
+  };
+
   const handleDelete = async (property) => {
-    // 1. Standard Confirmation
     if (!window.confirm(`Delete "${property.title}"?`)) return;
 
-    // 2. Check for Unlocks (Double Confirmation)
-    // We ask the user specifically about unlocked records
     const confirmUnlocks = window.confirm(
-      "Do you want to DELETE the associated unlock records for this property as well?\n\n" +
-      "Click 'OK' to DELETE UNLOCKS AND PROPERTY.\n" + 
-      "Click 'Cancel' to STOP (if you need to keep unlock history)."
+      "Delete associated unlock records too?\n\n" +
+      "OK = Delete Everything.\n" + 
+      "Cancel = Stop."
     );
 
     if (confirmUnlocks) {
       try {
-        // Step A: Delete Unlocks first (assuming table is named 'unlocks')
-        // Note: If your database has 'ON DELETE CASCADE' setup, this step is automatic, but we do it manually to be safe.
+        // Delete unlocks
         await supabase.from('unlocks').delete().eq('property_id', property.id);
-
-        // Step B: Delete Property
+        
+        // Delete property
         const { error } = await supabase.from('properties').delete().eq('id', property.id);
+        
         if (error) throw error;
 
-        setProperties(properties.filter(p => p.id !== property.id));
+        setProperties(prev => prev.filter(p => p.id !== property.id));
         alert("Property deleted.");
       } catch (err) {
         alert("Delete failed: " + err.message);
       }
-    } else {
-      alert("Deletion cancelled.");
     }
   };
 
@@ -67,8 +116,7 @@ const AdminProperties = () => {
   };
 
   const handleSave = (updatedData) => {
-    // Update local state after successful save
-    setProperties(properties.map(p => p.id === selectedProperty.id ? { ...p, ...updatedData } : p));
+    setProperties(prev => prev.map(p => p.id === selectedProperty.id ? { ...p, ...updatedData } : p));
   };
 
   if (loading) return <div className="p-6">Loading properties...</div>;
@@ -80,7 +128,6 @@ const AdminProperties = () => {
         <p className="text-gray-600">Manage listings, edit GPS, and handle deletions.</p>
       </div>
 
-      {/* Table */}
       <div className="bg-white rounded-xl shadow overflow-hidden">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
@@ -89,6 +136,7 @@ const AdminProperties = () => {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Location</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Price</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Featured</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
             </tr>
           </thead>
@@ -113,6 +161,20 @@ const AdminProperties = () => {
                     {prop.status}
                   </span>
                 </td>
+                
+                <td className="px-6 py-4">
+                  <button 
+                    onClick={() => toggleFeatured(prop)}
+                    className={`px-3 py-1 text-xs rounded-full font-semibold border transition-all duration-200 ${
+                      prop.featured === 'true'
+                        ? 'bg-yellow-100 text-yellow-800 border-yellow-300 hover:bg-yellow-200' 
+                        : 'bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200'
+                    }`}
+                  >
+                    {prop.featured === 'true' ? '★ Featured' : '☆ Feature'}
+                  </button>
+                </td>
+
                 <td className="px-6 py-4 text-sm space-x-2">
                   <button onClick={() => openEditModal(prop)} className="text-blue-600 hover:underline font-medium">Edit</button>
                   <button onClick={() => handleDelete(prop)} className="text-red-600 hover:underline font-medium">Delete</button>
@@ -123,7 +185,6 @@ const AdminProperties = () => {
         </table>
       </div>
 
-      {/* Use the Modal Component */}
       <EditPropertyModal 
         isOpen={isEditModalOpen} 
         onClose={() => setIsEditModalOpen(false)} 

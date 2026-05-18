@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Autoplay, Pagination, Navigation } from 'swiper/modules';
 
@@ -8,33 +8,101 @@ import 'swiper/css/pagination';
 import 'swiper/css/navigation';
 
 import GradientButton from '../components/GradientButton';
+import PropertyCard from '../components/PropertyCard';
+import PropertyDetailsModal from '../components/PropertyDetailsModal'; // Import the modal
+import { supabase } from '../lib/supabaseClient'; 
 
 export default function Home() {
   // ------------------------------------------
   // STATE & DATA
   // ------------------------------------------
   
-  // Hero Slides Data
-  const heroSlides = [
-    { id: 1, image: "https://images.unsplash.com/photo-1560518883-ce09059eeffa?ixlib=rb-4.0.3&auto=format&fit=crop&w=1073&q=80", title: "Spacious 3-Bedroom Apartment", location: "Westlands • KES 85,000/month" },
-    { id: 2, image: "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?ixlib=rb-4.0.3&auto=format&fit=crop&w=1170&q=80", title: "Contemporary Family Home", location: "Kileleshwa • KES 120,000/month" },
-    { id: 3, image: "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?ixlib=rb-4.0.3&auto=format&fit=crop&w=1170&q=80", title: "Luxury 2-Bedroom Suite", location: "Kilimani • KES 65,000/month" }
-  ];
+  // Hero Slides State
+  const [heroSlides, setHeroSlides] = useState([]);
+  const [loadingSlides, setLoadingSlides] = useState(true);
 
-  // Featured Areas Data
-  const [activeFilter, setActiveFilter] = useState('all');
-  const areas = [
-    { id: 1, name: "Westlands", type: "premium", image: "https://images.unsplash.com/photo-1580582932707-520aed937b7b?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80", rent: "KES 85,000+", count: "42 Listings" },
-    { id: 2, name: "Kilimani", type: "premium", image: "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80", rent: "KES 65,000+", count: "38 Listings" },
-    { id: 3, name: "Kileleshwa", type: "family", image: "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80", rent: "KES 120,000+", count: "28 Listings" },
-    { id: 4, name: "Roysambu", type: "affordable", image: "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80", rent: "KES 35,000+", count: "56 Listings" },
-    { id: 5, name: "South B", type: "student", image: "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80", rent: "KES 25,000+", count: "65 Listings" },
-    { id: 6, name: "Lavington", type: "premium", image: "https://images.unsplash.com/photo-1580582932707-520aed937b7b?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80", rent: "KES 150,000+", count: "22 Listings" },
-  ];
+  // Featured Properties State
+  const [featuredProperties, setFeaturedProperties] = useState([]);
+  const [loadingProperties, setLoadingProperties] = useState(true);
 
-  const filteredAreas = activeFilter === 'all' 
-    ? areas 
-    : areas.filter(area => area.type === activeFilter);
+  // MODAL STATE
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedProperty, setSelectedProperty] = useState(null);
+
+  // ------------------------------------------
+  // SIDE EFFECTS
+  // ------------------------------------------
+  
+  useEffect(() => {
+    fetchHeroSlides();
+    fetchFeaturedProperties();
+  }, []);
+
+  // ------------------------------------------
+  // FUNCTIONS
+  // ------------------------------------------
+
+  const fetchHeroSlides = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('properties')
+        .select('id, title, location, price, image_url')
+        .eq('featured', 'true') // Check for string 'true'
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      if (error) throw error;
+
+      if (data) {
+        const formattedSlides = data.map(item => ({
+            id: item.id,
+            image: item.image_url,
+            title: item.title,
+            location: `${item.location} • KES ${item.price?.toLocaleString()}/month`
+        }));
+        setHeroSlides(formattedSlides);
+      }
+    } catch (error) {
+      console.error('Error fetching hero slides:', error.message);
+    } finally {
+      setLoadingSlides(false);
+    }
+  };
+
+  const fetchFeaturedProperties = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('properties')
+        .select('*') 
+        .eq('featured', 'true') // Check for string 'true'
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(6); 
+
+      if (error) throw error;
+
+      if (data) {
+        setFeaturedProperties(data);
+      }
+    } catch (error) {
+      console.error('Error fetching featured properties:', error.message);
+    } finally {
+      setLoadingProperties(false);
+    }
+  };
+
+  // HANDLER: Open Modal
+  const handleViewDetails = (property) => {
+    setSelectedProperty(property);
+    setIsModalOpen(true);
+  };
+
+  // HANDLER: Close Modal
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedProperty(null);
+  };
 
   // ------------------------------------------
   // RENDER
@@ -67,25 +135,39 @@ export default function Home() {
 
               <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
                 <GradientButton size="lg"><i className="fas fa-search mr-2"></i> Start Your Search</GradientButton>
-                
               </div>
             </div>
 
             <div className="relative">
               <div className="relative rounded-3xl overflow-hidden shadow-2xl h-[500px]">
-                <Swiper modules={[Autoplay, Pagination, Navigation]} spaceBetween={0} slidesPerView={1} autoplay={{ delay: 5000 }} pagination={{ clickable: true }} navigation={true} loop={true} className="h-full">
-                  {heroSlides.map((slide) => (
-                    <SwiperSlide key={slide.id} className="relative">
-                      <img src={slide.image} alt={slide.title} className="w-full h-full object-cover" />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-                      <div className="absolute bottom-0 left-0 right-0 p-8 text-white">
-                        <span className="inline-block px-3 py-1 bg-primary-green text-sm font-semibold rounded mb-2">Verified</span>
-                        <h3 className="text-2xl font-bold mb-1">{slide.title}</h3>
-                        <p className="text-gray-200">{slide.location}</p>
-                      </div>
-                    </SwiperSlide>
-                  ))}
-                </Swiper>
+                {loadingSlides ? (
+                  <div className="w-full h-full flex items-center justify-center bg-gray-200 animate-pulse">
+                    <span>Loading Featured Homes...</span>
+                  </div>
+                ) : (
+                  <Swiper 
+                    modules={[Autoplay, Pagination, Navigation]} 
+                    spaceBetween={0} 
+                    slidesPerView={1} 
+                    autoplay={{ delay: 5000 }} 
+                    pagination={{ clickable: true }} 
+                    navigation={true} 
+                    loop={heroSlides.length > 1} 
+                    className="h-full"
+                  >
+                    {heroSlides.map((slide) => (
+                      <SwiperSlide key={slide.id} className="relative">
+                        <img src={slide.image} alt={slide.title} className="w-full h-full object-cover" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+                        <div className="absolute bottom-0 left-0 right-0 p-8 text-white">
+                          <span className="inline-block px-3 py-1 bg-primary-green text-sm font-semibold rounded mb-2">Featured</span>
+                          <h3 className="text-2xl font-bold mb-1">{slide.title}</h3>
+                          <p className="text-gray-200">{slide.location}</p>
+                        </div>
+                      </SwiperSlide>
+                    ))}
+                  </Swiper>
+                )}
               </div>
             </div>
 
@@ -93,38 +175,55 @@ export default function Home() {
         </div>
       </section>
 
-      {/* FEATURED RENTAL AREAS */}
+      {/* FEATURED PROPERTIES SECTION */}
       <section className="py-24 px-6 bg-gray-50">
         <div className="container mx-auto max-w-7xl">
           <div className="text-center mb-12">
-            <h2 className="text-4xl md:text-5xl font-bold mb-4 font-brand"><span className="brand-gradient">Featured</span> Rental Areas</h2>
-            <p className="text-gray-600 text-xl max-w-3xl mx-auto">Explore popular neighborhoods with verified listings</p>
+            <h2 className="text-4xl md:text-5xl font-bold mb-4 font-brand">
+              <span className="brand-gradient">Featured</span> Properties
+            </h2>
+            <p className="text-gray-600 text-xl max-w-3xl mx-auto">
+              Handpicked properties by our team for you
+            </p>
           </div>
-          <div className="flex flex-wrap justify-center gap-3 mb-12">
-            {['all', 'premium', 'affordable', 'family', 'student'].map(filter => (
-              <button key={filter} onClick={() => setActiveFilter(filter)} className={`px-5 py-2 rounded-full font-semibold transition-all duration-300 capitalize ${activeFilter === filter ? 'bg-gradient-to-r from-primary-blue to-primary-green text-white shadow-md' : 'bg-white text-gray-700 border border-gray-200 hover:border-primary-blue hover:text-primary-blue'}`}>
-                {filter === 'all' ? 'All Areas' : filter}
-              </button>
-            ))}
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {filteredAreas.map((area) => (
-              <div key={area.id} className="group relative overflow-hidden rounded-2xl h-80 shadow-lg cursor-pointer">
-                <img src={area.image} alt={area.name} className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
-                <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
-                  <div className="flex items-center mb-2"><i className="fas fa-map-marker-alt text-primary-green mr-2"></i><span className="text-sm opacity-90">Nairobi</span></div>
-                  <h3 className="text-2xl font-bold mb-1">{area.name}</h3>
-                  <div className="flex justify-between items-end">
-                    <div><p className="text-sm opacity-80">Average Rent</p><p className="text-lg font-bold">{area.rent}</p></div>
-                    <span className="text-xs bg-white/20 px-3 py-1 rounded-full backdrop-blur-sm">{area.count}</span>
-                  </div>
-                </div>
-              </div>
-            ))}
+
+          {loadingProperties ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {[1, 2, 3].map((n) => (
+                <div key={n} className="bg-white rounded-2xl h-96 animate-pulse"></div>
+              ))}
+            </div>
+          ) : featuredProperties.length === 0 ? (
+            <p className="text-center text-gray-500">No featured properties available at the moment.</p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {featuredProperties.map((property) => (
+                // PASS handleViewDetails TO THE CARD
+                <PropertyCard 
+                  key={property.id} 
+                  property={property} 
+                  onViewDetails={handleViewDetails} 
+                />
+              ))}
+            </div>
+          )}
+          
+          <div className="text-center mt-12">
+            <GradientButton size="lg">
+              <i className="fas fa-th-large mr-2"></i> View All Listings
+            </GradientButton>
           </div>
         </div>
       </section>
+
+      {/* PROPERTY DETAILS MODAL */}
+      {selectedProperty && (
+        <PropertyDetailsModal 
+          isOpen={isModalOpen}
+          onClose={handleCloseModal}
+          property={selectedProperty}
+        />
+      )}
 
     </main>
   );

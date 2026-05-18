@@ -122,15 +122,16 @@ export default function AddPropertyModal({ isOpen, onClose }) {
     );
   };
 
+  // UPDATED: Allow up to 10 images
   const handleImageChange = (e) => {
     const files = Array.from(e.target.files);
     if (!files.length) return;
 
     const currentCount = imageFiles.length;
-    const availableSlots = 5 - currentCount;
+    const availableSlots = 10 - currentCount; // Changed from 5 to 10
 
     if (files.length > availableSlots) {
-      alert(`You can only upload ${availableSlots} more image(s). Limit is 5.`);
+      alert(`You can only upload ${availableSlots} more image(s). Limit is 10.`); // Updated alert text
     }
 
     const filesToAdd = files.slice(0, availableSlots);
@@ -158,22 +159,18 @@ export default function AddPropertyModal({ isOpen, onClose }) {
 
   // --- ULTRA-ROBUST Sanity Upload (Binary Method) ---
   const uploadToSanity = async (file) => {
-    // 1. URL for Binary Upload
     const url = `https://${SANITY_PROJECT_ID}.api.sanity.io/v2021-06-07/assets/images/${SANITY_DATASET}`;
     
-    // 2. Send Raw File as Body (No FormData)
-    // This fixes the "Invalid Image" / 422 error
     const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Accept': 'application/json',
         'Authorization': `Bearer ${SANITY_TOKEN}`,
-        'Content-Type': file.type // Explicitly set image mime type
+        'Content-Type': file.type
       },
-      body: file // Send the file object directly
+      body: file
     });
 
-    // 3. Handle Response
     if (!response.ok) {
       const errData = await response.json().catch(() => ({}));
       console.error("Sanity Error:", errData);
@@ -181,11 +178,7 @@ export default function AddPropertyModal({ isOpen, onClose }) {
     }
 
     const result = await response.json();
-    
-    // Sanity returns the document in `result.document` or directly
     const asset = result.document || result;
-    
-    // Return the secure URL
     return asset.url;
   };
 
@@ -314,7 +307,8 @@ export default function AddPropertyModal({ isOpen, onClose }) {
       case 4: 
         return (
           <div className="space-y-5 animate-fade-in">
-            <h3 className="text-xl font-bold text-gray-800 mb-2">Media (Max 5 Images)</h3>
+            {/* UPDATED: Header text to 10 */}
+            <h3 className="text-xl font-bold text-gray-800 mb-2">Media (Max 10 Images)</h3>
             
             <div className="grid grid-cols-3 gap-3">
               {imageFiles.map((img, index) => (
@@ -332,13 +326,15 @@ export default function AddPropertyModal({ isOpen, onClose }) {
                 </div>
               ))}
 
-              {imageFiles.length < 5 && (
+              {/* UPDATED: Condition to < 10 */}
+              {imageFiles.length < 10 && (
                 <div className="relative aspect-square group">
                   <div className="w-full h-full border-2 border-dashed border-blue-300 rounded-xl p-1 hover:border-blue-500 transition-colors bg-blue-50/50 flex items-center justify-center overflow-hidden relative cursor-pointer">
                     <div className="text-center text-blue-400 pointer-events-none">
                       <svg className="w-6 h-6 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
                       <p className="text-xs font-medium">Add Photos</p>
-                      <p className="text-[10px] text-gray-400">{5 - imageFiles.length} left</p>
+                      {/* UPDATED: Counter logic */}
+                      <p className="text-[10px] text-gray-400">{10 - imageFiles.length} left</p>
                     </div>
                     <input 
                       type="file" 
