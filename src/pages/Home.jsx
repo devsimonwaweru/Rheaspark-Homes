@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom'; // Import Link
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Autoplay, Pagination, Navigation } from 'swiper/modules';
 
@@ -9,7 +10,7 @@ import 'swiper/css/navigation';
 
 import GradientButton from '../components/GradientButton';
 import PropertyCard from '../components/PropertyCard';
-import PropertyDetailsModal from '../components/PropertyDetailsModal'; // Import the modal
+import PropertyDetailsModal from '../components/PropertyDetailsModal'; 
 import { supabase } from '../lib/supabaseClient'; 
 
 export default function Home() {
@@ -134,7 +135,12 @@ export default function Home() {
               </p>
 
               <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
-                <GradientButton size="lg"><i className="fas fa-search mr-2"></i> Start Your Search</GradientButton>
+                {/* UPDATED: Link to /find-houses */}
+                <Link to="/find-houses">
+                  <GradientButton size="lg">
+                    <i className="fas fa-search mr-2"></i> Start Your Search
+                  </GradientButton>
+                </Link>
               </div>
             </div>
 
@@ -198,7 +204,6 @@ export default function Home() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {featuredProperties.map((property) => (
-                // PASS handleViewDetails TO THE CARD
                 <PropertyCard 
                   key={property.id} 
                   property={property} 
@@ -209,9 +214,12 @@ export default function Home() {
           )}
           
           <div className="text-center mt-12">
-            <GradientButton size="lg">
-              <i className="fas fa-th-large mr-2"></i> View All Listings
-            </GradientButton>
+            {/* UPDATED: Link to /find-houses */}
+            <Link to="/find-houses">
+              <GradientButton size="lg">
+                <i className="fas fa-th-large mr-2"></i> View All Listings
+              </GradientButton>
+            </Link>
           </div>
         </div>
       </section>
