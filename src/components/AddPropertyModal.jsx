@@ -1,6 +1,8 @@
+/* eslint-disable no-unused-vars */
 // src/components/AddPropertyModal.jsx
 import React, { useState, useEffect } from "react";
 import { supabase } from "../lib/supabaseClient";
+import { counties, constituencies } from "../data/locations"; // Import fixed data
 
 // --- Sanity Configuration ---
 const SANITY_PROJECT_ID = import.meta.env.VITE_SANITY_PROJECT_ID;
@@ -32,7 +34,7 @@ const Input = ({ label, name, value, onChange, type = "text", placeholder, requi
   );
 };
 
-const Select = ({ label, name, value, onChange, options, color = "blue" }) => {
+const Select = ({ label, name, value, onChange, options, color = "blue", disabled = false, placeholder = "Select..." }) => {
   const colorClasses = {
     blue: "border-blue-200 focus:border-blue-500 focus:ring-blue-100",
     green: "border-emerald-200 focus:border-emerald-500 focus:ring-emerald-100",
@@ -46,9 +48,11 @@ const Select = ({ label, name, value, onChange, options, color = "blue" }) => {
         name={name}
         value={value}
         onChange={onChange}
-        className={`w-full bg-white border-2 ${colorClasses} rounded-xl p-3.5 text-gray-800 transition-all outline-none focus:ring-2 appearance-none cursor-pointer`}
+        disabled={disabled}
+        className={`w-full bg-white border-2 ${colorClasses} rounded-xl p-3.5 text-gray-800 transition-all outline-none focus:ring-2 appearance-none cursor-pointer ${disabled ? 'bg-gray-50 text-gray-400 cursor-not-allowed' : ''}`}
       >
-        {options.map(opt => <option key={opt}>{opt}</option>)}
+        <option value="">{placeholder}</option>
+        {options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
       </select>
     </div>
   );
@@ -65,12 +69,17 @@ export default function AddPropertyModal({ isOpen, onClose }) {
 
   const [formData, setFormData] = useState({
     title: "", type: "Apartment", description: "",
-    price: "", location: "", bedrooms: "0", bathrooms: "0", size: "",
+    price: "", 
+    county: "", constituency: "", town: "", landmark: "", location: "",
+    bedrooms: "0", bathrooms: "0", size: "",
     parking: "None", security_deposit: "", availability_date: "",
     issues: "", solutions: "",
     landlord_name: "", landlord_phone: "", landlord_email: "",
     latitude: null, longitude: null,
   });
+
+  // Dynamic options for constituency dropdown
+  const [constituencyOptions, setConstituencyOptions] = useState([]);
 
   const [amenities, setAmenities] = useState([]);
 
@@ -88,8 +97,57 @@ export default function AddPropertyModal({ isOpen, onClose }) {
     };
   }, [imageFiles]);
 
+  // --- Handlers ---
+
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  // Handler: County Change -> Update Constituency List & Reset
+  const handleCountyChange = (e) => {
+    const selectedCounty = e.target.value;
+    const constits = selectedCounty ? constituencies[selectedCounty] : [];
+    
+    setConstituencyOptions(constits);
+    
+    setFormData(prev => ({
+      ...prev,
+      county: selectedCounty,
+      constituency: "", // Reset constituency
+      town: "", // Reset town
+      location: selectedCounty
+    }));
+  };
+
+  // Handler: Constituency Change
+  const handleConstituencyChange = (e) => {
+    const selectedConstituency = e.target.value;
+    
+    setFormData(prev => ({
+      ...prev,
+      constituency: selectedConstituency,
+      location: `${selectedConstituency}, ${prev.county}`
+    }));
+  };
+
+  // Handler: Town/Area Input (Free Text)
+  const handleTownChange = (e) => {
+    const town = e.target.value;
+    setFormData(prev => ({
+      ...prev,
+      town: town,
+      location: `${town}, ${prev.constituency}, ${prev.county}`
+    }));
+  };
+
+  // Handler: Landmark Input
+  const handleLandmarkChange = (e) => {
+    const landmark = e.target.value;
+    setFormData(prev => ({
+      ...prev,
+      landmark: landmark,
+      location: `${prev.town ? prev.town + ', ' : ''}${prev.constituency}, ${prev.county}${landmark ? ' (Near ' + landmark + ')' : ''}`
+    }));
   };
 
   const toggleAmenity = (amenity) => {
@@ -101,10 +159,7 @@ export default function AddPropertyModal({ isOpen, onClose }) {
   };
 
   const handleGetLocation = () => {
-    if (!navigator.geolocation) {
-      alert("Geolocation is not supported by your browser.");
-      return;
-    }
+    if (!navigator.geolocation) return alert("Geolocation not supported");
     setGpsStatus("loading");
     navigator.geolocation.getCurrentPosition(
       (position) => {
@@ -122,20 +177,18 @@ export default function AddPropertyModal({ isOpen, onClose }) {
     );
   };
 
-  // UPDATED: Allow up to 10 images
   const handleImageChange = (e) => {
     const files = Array.from(e.target.files);
     if (!files.length) return;
 
     const currentCount = imageFiles.length;
-    const availableSlots = 10 - currentCount; // Changed from 5 to 10
+    const availableSlots = 10 - currentCount;
 
     if (files.length > availableSlots) {
-      alert(`You can only upload ${availableSlots} more image(s). Limit is 10.`); // Updated alert text
+      alert(`Limit 10 images. You can add ${availableSlots} more.`);
     }
 
     const filesToAdd = files.slice(0, availableSlots);
-
     const newFilesWithPreview = filesToAdd.map(file => ({
       file,
       preview: URL.createObjectURL(file)
@@ -157,10 +210,8 @@ export default function AddPropertyModal({ isOpen, onClose }) {
   const nextStep = () => setStep(prev => prev + 1);
   const prevStep = () => setStep(prev => prev - 1);
 
-  // --- ULTRA-ROBUST Sanity Upload (Binary Method) ---
   const uploadToSanity = async (file) => {
     const url = `https://${SANITY_PROJECT_ID}.api.sanity.io/v2021-06-07/assets/images/${SANITY_DATASET}`;
-    
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -170,20 +221,13 @@ export default function AddPropertyModal({ isOpen, onClose }) {
       },
       body: file
     });
-
-    if (!response.ok) {
-      const errData = await response.json().catch(() => ({}));
-      console.error("Sanity Error:", errData);
-      throw new Error(errData.error?.description || "Upload failed");
-    }
-
+    if (!response.ok) throw new Error("Upload failed");
     const result = await response.json();
-    const asset = result.document || result;
-    return asset.url;
+    return (result.document || result).url;
   };
 
   const handleSubmit = async () => {
-    if (imageFiles.length === 0) return alert("Please upload at least one property image");
+    if (imageFiles.length === 0) return alert("Please upload at least one image");
     
     setLoading(true);
     try {
@@ -232,12 +276,12 @@ export default function AddPropertyModal({ isOpen, onClose }) {
       case 1: 
         return (
           <div className="space-y-5 animate-fade-in">
-            <h3 className="text-xl font-bold text-gray-800 mb-2">Let's start with the basics</h3>
-            <Input label="Property Title" name="title" value={formData.title} onChange={handleChange} placeholder="e.g. Modern Studio near CBD" required />
+            <h3 className="text-xl font-bold text-gray-800 mb-2">Basics</h3>
+            <Input label="Property Title" name="title" value={formData.title} onChange={handleChange} placeholder="e.g. Modern Studio" required />
             <Select label="Property Type" name="type" value={formData.type} onChange={handleChange} options={["Apartment", "House", "Studio", "Bedsitter", "Single Room"]} />
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1.5">Description</label>
-              <textarea name="description" value={formData.description} onChange={handleChange} rows="3" className="w-full bg-white border-2 border-blue-200 focus:border-blue-500 focus:ring-blue-100 rounded-xl p-3.5 text-gray-800 transition-all outline-none focus:ring-2 resize-none" placeholder="Describe the unique features..."></textarea>
+              <textarea name="description" value={formData.description} onChange={handleChange} rows="3" className="w-full bg-white border-2 border-blue-200 focus:border-blue-500 focus:ring-blue-100 rounded-xl p-3.5 text-gray-800 transition-all outline-none focus:ring-2 resize-none" placeholder="Describe features..."></textarea>
             </div>
           </div>
         );
@@ -245,17 +289,68 @@ export default function AddPropertyModal({ isOpen, onClose }) {
       case 2: 
         return (
           <div className="space-y-5 animate-fade-in">
-            <h3 className="text-xl font-bold text-gray-800 mb-2">Location & Specifications</h3>
+            <h3 className="text-xl font-bold text-gray-800 mb-2">Location Details</h3>
+            
+            {/* County & Constituency Dropdowns */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-              <Input label="Location / Area" name="location" value={formData.location} onChange={handleChange} placeholder="Kilimani" required color="green" />
-              <Input label="Size (sqft)" name="size" value={formData.size} onChange={handleChange} placeholder="1200" color="green" />
-              <Input label="Bedrooms" name="bedrooms" type="number" value={formData.bedrooms} onChange={handleChange} color="green" />
-              <Input label="Bathrooms" name="bathrooms" type="number" value={formData.bathrooms} onChange={handleChange} color="green" />
-              <Select label="Parking" name="parking" value={formData.parking} onChange={handleChange} options={["None", "Shared", "1 Dedicated", "2+"]} color="green" />
+              <Select 
+                label="County" 
+                name="county" 
+                value={formData.county} 
+                onChange={handleCountyChange} 
+                options={counties} 
+                color="green" 
+                placeholder="Select County"
+              />
+              
+              <Select 
+                label="Constituency" 
+                name="constituency" 
+                value={formData.constituency} 
+                onChange={handleConstituencyChange} 
+                options={constituencyOptions} 
+                color="green" 
+                disabled={!formData.county}
+                placeholder="Select Constituency"
+              />
+            </div>
+
+            {/* Town and Landmark are Free Text Inputs */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                <Input 
+                    label="Town / Area" 
+                    name="town" 
+                    value={formData.town} 
+                    onChange={handleTownChange} 
+                    placeholder="e.g. Kilimani, Runda" 
+                    color="green"
+                />
+                <Input 
+                    label="Landmark / Street" 
+                    name="landmark" 
+                    value={formData.landmark} 
+                    onChange={handleLandmarkChange} 
+                    placeholder="e.g. Near Yaya Centre" 
+                    color="green" 
+                />
+            </div>
+
+            {/* Location Preview */}
+            <div className="p-3 bg-gray-50 rounded-lg text-sm text-gray-500 border border-dashed">
+                <span className="font-medium text-gray-700">Full Address:</span> 
+                {formData.location || 'Select location above'}
+            </div>
+
+            {/* Specs */}
+            <div className="grid grid-cols-2 gap-5 pt-4 border-t">
+                <Input label="Size (sqft)" name="size" value={formData.size} onChange={handleChange} placeholder="1200" color="green" />
+                <Select label="Parking" name="parking" value={formData.parking} onChange={handleChange} options={["None", "Shared", "1 Dedicated", "2+"]} color="green" />
+                <Input label="Bedrooms" name="bedrooms" type="number" value={formData.bedrooms} onChange={handleChange} color="green" />
+                <Input label="Bathrooms" name="bathrooms" type="number" value={formData.bathrooms} onChange={handleChange} color="green" />
             </div>
             
             <div className="pt-2">
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5">Exact Location (Optional)</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-1.5">GPS Location (Optional)</label>
               <button type="button" onClick={handleGetLocation} disabled={gpsStatus === "loading"} className={`w-full flex items-center justify-center space-x-2 py-3 px-4 rounded-xl border-2 transition-all font-medium ${gpsStatus === "success" ? "bg-green-50 border-green-400 text-green-700" : "bg-white border-gray-200 text-gray-600 hover:border-blue-400 hover:text-blue-600"}`}>
                   {gpsStatus === "loading" ? (
                     <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
@@ -307,7 +402,6 @@ export default function AddPropertyModal({ isOpen, onClose }) {
       case 4: 
         return (
           <div className="space-y-5 animate-fade-in">
-            {/* UPDATED: Header text to 10 */}
             <h3 className="text-xl font-bold text-gray-800 mb-2">Media (Max 10 Images)</h3>
             
             <div className="grid grid-cols-3 gap-3">
@@ -326,14 +420,12 @@ export default function AddPropertyModal({ isOpen, onClose }) {
                 </div>
               ))}
 
-              {/* UPDATED: Condition to < 10 */}
               {imageFiles.length < 10 && (
                 <div className="relative aspect-square group">
                   <div className="w-full h-full border-2 border-dashed border-blue-300 rounded-xl p-1 hover:border-blue-500 transition-colors bg-blue-50/50 flex items-center justify-center overflow-hidden relative cursor-pointer">
                     <div className="text-center text-blue-400 pointer-events-none">
                       <svg className="w-6 h-6 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
                       <p className="text-xs font-medium">Add Photos</p>
-                      {/* UPDATED: Counter logic */}
                       <p className="text-[10px] text-gray-400">{10 - imageFiles.length} left</p>
                     </div>
                     <input 
