@@ -46,7 +46,7 @@ export default function PaymentModal({ isOpen, onClose, amount, type, propertyId
           phone, 
           type, 
           property_id: propertyId,
-          userId: session.user.id // <--- FIX: Added userId to body
+          userId: session.user.id 
         }
       });
 
@@ -106,7 +106,8 @@ export default function PaymentModal({ isOpen, onClose, amount, type, propertyId
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    // FIX: Changed z-50 to z-[200] so it sits ABOVE the PropertyDetailsModal (which is z-[100])
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
       <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden animate-scale-in">
         
         {/* Header */}
@@ -219,7 +220,7 @@ export default function PaymentModal({ isOpen, onClose, amount, type, propertyId
         )}
       </div>
       
-      <style jsx>{`
+      <style>{`
         @keyframes scale-in {
           0% { transform: scale(0.95); opacity: 0; }
           100% { transform: scale(1); opacity: 1; }
