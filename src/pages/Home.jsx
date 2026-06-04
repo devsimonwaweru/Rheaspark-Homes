@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router-dom'; // Ensure Link is imported
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Autoplay, Pagination, Navigation } from 'swiper/modules';
 
@@ -229,15 +229,14 @@ export default function Home() {
               </div>
               
               <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
-                <a 
-                  href="https://keja-zetu-rentals.vercel.app/" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
+                {/* UPDATED: Internal Link to /subscribe */}
+                <Link 
+                  to="/subscribe"
                   className="inline-flex items-center justify-center bg-white text-indigo-700 font-bold py-3 px-8 rounded-xl shadow-lg hover:bg-indigo-50 transition-all transform hover:scale-105"
                 >
                   Subscribe Now
                   <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
-                </a>
+                </Link>
               </div>
             </div>
 

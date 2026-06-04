@@ -1,3 +1,4 @@
+// src/pages/SubscriptionPage.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
@@ -18,11 +19,13 @@ export default function SubscriptionPage() {
         navigate('/login');
       } else {
         setUser(session.user);
+        // Check if already subscribed
         const { data: landlord } = await supabase
           .from('landlords')
           .select('subscription_status')
           .eq('id', session.user.id)
           .single();
+        
         if (landlord?.subscription_status === 'active') {
           navigate('/landlord');
         }
@@ -34,7 +37,7 @@ export default function SubscriptionPage() {
 
   const handlePayment = async () => {
     if (!phone) {
-      setError("Please enter your phone number.");
+      setError("Please enter your M-Pesa phone number.");
       return;
     }
     
@@ -53,7 +56,10 @@ export default function SubscriptionPage() {
           },
           body: JSON.stringify({ 
             phone: phone, 
-            type: 'subscription', // Ensure your backend handles this 'subscription' type as the Yearly plan
+            // Sending 'subscription' type. 
+            // NOTE: Ensure your backend/Supafunction handles the amount logic. 
+            // If your backend forces a specific amount, update it there to 1199.
+            type: 'subscription', 
             userId: user.id 
           }),
         }
@@ -65,7 +71,7 @@ export default function SubscriptionPage() {
         throw new Error(data.error || "Payment failed to initialize");
       }
 
-      alert("STK Push sent! Please check your phone.");
+      alert("STK Push sent! Please check your phone and enter PIN.");
       setPaymentId(data.payment_id); 
       pollPaymentStatus(data.payment_id);
 
@@ -96,11 +102,11 @@ export default function SubscriptionPage() {
           handleSuccess(); 
         } else if (payment?.status === 'failed') {
           clearInterval(interval);
-          setError("Payment failed.");
+          setError("Payment failed or cancelled.");
           setProcessing(false);
         } else if (attempts >= maxAttempts) {
           clearInterval(interval);
-          setError("Automatic check timed out. Use button below if you paid.");
+          setError("Verification timed out. Please use the button below if you paid.");
         }
       } catch (e) { 
         console.error("Polling error:", e); 
@@ -125,11 +131,11 @@ export default function SubscriptionPage() {
         if (data.status === 'paid') {
             handleSuccess();
         } else {
-            alert("Not confirmed yet. If you paid, wait 10 seconds and try again.");
+            alert("Not confirmed yet. If you paid, please wait 10 seconds and try again.");
         }
     } catch (e) {
         console.error(e);
-        alert("Error checking payment.");
+        alert("Error checking payment status.");
     }
   };
 
@@ -139,62 +145,103 @@ export default function SubscriptionPage() {
     navigate('/landlord'); 
   };
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-600"></div></div>;
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-600"></div>
+    </div>
+  );
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 flex flex-col items-center justify-center p-4 relative">
+      
+      {/* Background Decoration */}
+      <div className="absolute inset-0 overflow-hidden opacity-20">
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-blue-500 rounded-full filter blur-3xl"></div>
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-indigo-500 rounded-full filter blur-3xl"></div>
+      </div>
+
+      <div className="relative z-10 w-full max-w-lg">
+        
+        {/* Header */}
         <div className="text-center mb-8">
-           <h1 className="text-3xl font-bold text-gray-800">Activate Your Account</h1>
+          <h1 className="text-4xl md:text-5xl font-extrabold text-white mb-2 tracking-tight">
+            Go Pro
+          </h1>
+          <p className="text-indigo-200">
+            Unlock the full power of property management.
+          </p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
-          {/* Updated Header for Yearly Plan */}
-          <div className="p-6 bg-gradient-to-r from-blue-600 to-emerald-500 text-white text-center">
-            <p className="text-sm uppercase tracking-wider opacity-80">Landlord Yearly Plan</p>
-            {/* Changed Price to 549/yr */}
-            <h2 className="text-4xl font-bold my-2">KES 549<span className="text-lg font-normal">/yr</span></h2>
-            <p className="text-xs opacity-75 mt-1">One-time annual payment</p>
+        {/* Card */}
+        <div className="bg-white/10 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 overflow-hidden">
+          
+          {/* Price Header */}
+          <div className="p-8 text-center border-b border-white/10 bg-gradient-to-r from-blue-600/20 to-indigo-600/20">
+            <span className="inline-block bg-yellow-400 text-yellow-900 text-xs font-bold px-3 py-1 rounded-full uppercase mb-4 shadow-sm">
+              Limited Offer
+            </span>
+            <div className="flex items-end justify-center text-white">
+              <span className="text-2xl font-medium mr-1">KES</span>
+              <span className="text-6xl font-extrabold tracking-tight">1,199</span>
+            </div>
+            <p className="text-indigo-100 mt-2 text-sm font-medium">Per Property / Month</p>
+            <p className="text-xs text-indigo-300 mt-1">1st Month FREE on subscription</p>
           </div>
 
-          <div className="p-6 space-y-4">
-             <ul className="space-y-3">
-              <li className="flex items-center text-gray-700">
-                <svg className="w-5 h-5 mr-3 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>
-                Post unlimited properties
-              </li>
-              <li className="flex items-center text-gray-700">
-                <svg className="w-5 h-5 mr-3 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>
-                Verified badge & priority support
-              </li>
+          {/* Features */}
+          <div className="p-8 space-y-6">
+            <ul className="space-y-4">
+              {[
+                "Automated Rent Collection (M-Pesa)",
+                "Tenant Onboarding Links",
+                "Real-time Dashboard & Reports",
+                "Vacancy & Occupancy Tracking",
+                "Priority Support"
+              ].map((feature, i) => (
+                <li key={i} className="flex items-center text-white">
+                  <div className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center mr-3 flex-shrink-0">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                  </div>
+                  <span className="text-sm font-medium opacity-90">{feature}</span>
+                </li>
+              ))}
             </ul>
 
-            <div className="pt-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">M-Pesa Phone Number</label>
+            {/* Payment Form */}
+            <div className="pt-6 border-t border-white/10">
+              <label className="block text-sm font-medium text-indigo-100 mb-2">M-Pesa Phone Number</label>
               <input 
                 type="tel" 
                 placeholder="e.g 0712345678"
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                className="w-full px-5 py-4 bg-white/10 border border-white/20 rounded-xl text-white placeholder-indigo-200 focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none transition-all"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 disabled={processing}
               />
             </div>
 
-            {error && <p className="text-red-500 text-sm text-center bg-red-50 p-2 rounded-lg">{error}</p>}
+            {error && (
+              <div className="bg-red-500/20 border border-red-400/30 text-red-200 text-sm p-3 rounded-xl text-center">
+                {error}
+              </div>
+            )}
 
             <button
               onClick={handlePayment}
               disabled={processing}
-              className="w-full mt-4 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl shadow-lg transition-all disabled:opacity-50 flex items-center justify-center"
+              className="w-full bg-white text-indigo-700 font-bold py-4 rounded-xl shadow-lg hover:bg-indigo-50 transition-all disabled:opacity-50 flex items-center justify-center text-lg"
             >
-              {processing ? "Processing..." : "Pay KES 549"}
+              {processing ? (
+                <svg className="animate-spin h-6 w-6 text-indigo-700" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+              ) : (
+                "Pay Now"
+              )}
             </button>
 
             {processing && (
               <button
                 onClick={handleManualCheck}
-                className="w-full mt-2 text-blue-600 border border-blue-200 hover:bg-blue-50 font-medium py-3 rounded-xl transition-all text-sm"
+                className="w-full mt-2 text-indigo-200 border border-white/20 hover:bg-white/10 font-medium py-3 rounded-xl transition-all text-sm"
               >
                 I have paid, verify now
               </button>
@@ -202,6 +249,10 @@ export default function SubscriptionPage() {
 
           </div>
         </div>
+        
+        <p className="text-center text-indigo-300 text-xs mt-6 opacity-70">
+          Secure payments powered by IntaSend.
+        </p>
       </div>
     </div>
   );

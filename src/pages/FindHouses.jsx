@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "../lib/supabaseClient";
+import { Link } from "react-router-dom"; // Import Link
 import { counties, constituencies } from "../data/locations";
 import PropertyCard from "../components/PropertyCard";
 import PropertyDetailsModal from "../components/PropertyDetailsModal";
@@ -100,7 +101,7 @@ export default function FindHouses() {
           <p className="text-gray-500 text-lg">Browse verified listings.</p>
         </div>
 
-        {/* --- Filter UI --- */}
+        {/* Filter UI */}
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 mb-8 space-y-4">
           
           <div className="relative">
@@ -205,7 +206,7 @@ export default function FindHouses() {
             </div>
         </div>
 
-        {/* --- RENTAL MANAGEMENT BANNER --- */}
+        {/* --- UPDATED: RENTAL MANAGEMENT BANNER --- */}
         <div className="mb-8 bg-gradient-to-r from-indigo-600 to-purple-700 rounded-2xl p-6 text-white shadow-lg flex flex-col md:flex-row items-center justify-between">
             <div className="mb-4 md:mb-0 flex items-center">
                 <div className="bg-white/20 p-3 rounded-xl mr-4 hidden sm:block">
@@ -215,17 +216,16 @@ export default function FindHouses() {
                 </div>
                 <div>
                     <h3 className="text-lg md:text-xl font-bold">Are you a Landlord?</h3>
-                    <p className="text-sm text-indigo-100">Automate your rent for <span className="font-bold">KES 1,199/mo</span>. Get 1 Month Free!</p>
+                    <p className="text-sm text-indigo-100">Automate your rent collection & tenant management today.</p>
                 </div>
             </div>
-            <a 
-                href="https://keja-zetu-rentals.vercel.app/" 
-                target="_blank" 
-                rel="noopener noreferrer"
+            {/* UPDATED: Internal Link */}
+            <Link 
+                to="/subscribe" 
                 className="flex-shrink-0 bg-white text-indigo-700 font-bold py-2.5 px-6 rounded-xl shadow-md hover:bg-indigo-50 transition-colors text-sm"
             >
-                Subscribe Now
-            </a>
+                Get Started Free
+            </Link>
         </div>
 
         <div className="flex justify-between items-center mb-6">
