@@ -44,13 +44,10 @@ export default function LandlordHome() {
 
   // --- ROBUST DELETE LOGIC ---
   const handleDelete = async (property) => {
-    // 1. Initial Confirmation
     const confirmProp = window.confirm(`Are you sure you want to delete "${property.title}"?`);
     if (!confirmProp) return;
 
     try {
-      // 2. Check for Constraints (Unlocks)
-      // We check if any user has unlocked this property.
       const { data: unlocks, error: unlockCheckError } = await supabase
         .from('unlocks')
         .select('id')
@@ -58,7 +55,6 @@ export default function LandlordHome() {
 
       if (unlockCheckError) throw unlockCheckError;
 
-      // 3. Handle Constraint Logic
       if (unlocks && unlocks.length > 0) {
         const confirmUnlockDelete = window.confirm(
           `This property has ${unlocks.length} unlock record(s). Database constraints require deleting these first.\n\n` +
@@ -67,7 +63,6 @@ export default function LandlordHome() {
         );
 
         if (confirmUnlockDelete) {
-          // Delete unlocks first
           const { error: deleteUnlockError } = await supabase
             .from('unlocks')
             .delete()
@@ -80,7 +75,6 @@ export default function LandlordHome() {
         }
       }
 
-      // 4. Delete Property
       const { error: deletePropError } = await supabase
         .from('properties')
         .delete()
@@ -88,7 +82,6 @@ export default function LandlordHome() {
 
       if (deletePropError) throw deletePropError;
 
-      // Update UI
       setProperties(properties.filter(p => p.id !== property.id));
       alert("Property deleted successfully.");
 
@@ -108,7 +101,6 @@ export default function LandlordHome() {
   };
 
   const toggleStatus = async (property) => {
-    // Optimistic UI update
     const newStatus = property.status === 'active' ? 'inactive' : 'active';
     setProperties(properties.map(p => p.id === property.id ? { ...p, status: newStatus } : p));
 
@@ -118,7 +110,6 @@ export default function LandlordHome() {
       .eq('id', property.id);
     
     if (error) {
-      // Revert on error
       setProperties(properties.map(p => p.id === property.id ? { ...p, status: property.status } : p));
       alert("Failed to update status: " + error.message);
     }
@@ -145,6 +136,38 @@ export default function LandlordHome() {
         </h1>
         <p className="text-blue-100">Manage your properties and track performance.</p>
       </div>
+
+      {/* --- RENTAL MANAGEMENT ADVERT BANNER --- */}
+      <div className="bg-gradient-to-r from-purple-600 to-indigo-700 rounded-2xl p-6 md:p-8 text-white shadow-xl mb-8 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full -mr-32 -mt-32"></div>
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-white opacity-5 rounded-full -ml-24 -mb-24"></div>
+        
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between">
+          <div className="mb-4 md:mb-0">
+            <span className="inline-block bg-yellow-400 text-yellow-900 text-xs font-bold px-3 py-1 rounded-full uppercase mb-3 shadow-sm">
+              Limited Offer
+            </span>
+            <h2 className="text-2xl font-bold mb-1">Automate Your Rentals</h2>
+            <p className="text-indigo-100 text-sm md:text-base max-w-lg mb-2">
+              Subscribe to our Rental Management System for just <span className="font-bold text-white">KES 1,199/month per property</span>.
+            </p>
+            <p className="text-yellow-300 text-sm font-semibold">
+              🎁 Get 1 MONTH FREE on your first subscription!
+            </p>
+          </div>
+          
+          <a 
+            href="https://keja-zetu-rentals.vercel.app/" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="inline-flex items-center justify-center bg-white text-indigo-700 font-bold py-3 px-6 rounded-xl shadow-lg hover:bg-indigo-50 transition-all transform hover:scale-105 mt-4 md:mt-0"
+          >
+            Subscribe Now
+            <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+          </a>
+        </div>
+      </div>
+      {/* --- END ADVERT BANNER --- */}
 
       {/* Actions */}
       <div className="flex justify-between items-center mb-8">

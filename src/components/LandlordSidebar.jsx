@@ -30,8 +30,8 @@ export default function LandlordSidebar({ onAddProperty }) {
   };
 
   const handleAddClick = () => {
-    setIsOpen(false); // Close mobile menu if open
-    onAddProperty();  // Trigger modal
+    setIsOpen(false); 
+    onAddProperty(); 
   };
 
   return (
@@ -89,7 +89,7 @@ export default function LandlordSidebar({ onAddProperty }) {
           {/* Navigation */}
           <nav className="flex flex-col gap-2 flex-grow">
             
-            {/* 1. Home Link (New) */}
+            {/* 1. Home Link */}
             <Link
               to="/"
               onClick={() => setIsOpen(false)}
@@ -125,10 +125,32 @@ export default function LandlordSidebar({ onAddProperty }) {
               className="flex items-center space-x-3 py-3 px-4 rounded-xl transition-all duration-200 font-medium text-gray-600 hover:bg-gray-50 hover:text-blue-600 text-left w-full group"
             >
               <div className="w-5 h-5 flex items-center justify-center rounded-full border-2 border-dashed border-gray-300 group-hover:border-blue-500 transition-colors">
-                 <svg className="w-3 h-3 text-gray-400 group-hover:text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
+                 <svg className="w-3 h-3 text-gray-400 group-hover:text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" /></svg>
               </div>
               <span>Add Property</span>
             </button>
+
+            {/* --- RENTAL MANAGEMENT ADVERT --- */}
+            <div className="mt-6 p-4 bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl border border-indigo-100 shadow-sm">
+              <div className="flex items-center space-x-2 mb-2">
+                <span className="flex-shrink-0 w-8 h-8 bg-indigo-100 text-indigo-600 rounded-lg flex items-center justify-center">
+                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+                </span>
+                <span className="text-xs font-bold text-indigo-800 uppercase tracking-wider">Pro Feature</span>
+              </div>
+              <h4 className="font-bold text-gray-800 text-sm mb-1">Rental Manager</h4>
+              <p className="text-xs text-gray-500 mb-2">Automate rent collection & tenants.</p>
+              <p className="text-xs font-bold text-indigo-600 mb-3">KES 1,199/mo per property</p>
+              
+              <a 
+                href="https://keja-zetu-rentals.vercel.app/" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="block w-full text-center bg-indigo-600 text-white text-xs font-bold py-2 px-3 rounded-lg hover:bg-indigo-700 transition-colors shadow-sm"
+              >
+                Subscribe Now
+              </a>
+            </div>
 
           </nav>
           

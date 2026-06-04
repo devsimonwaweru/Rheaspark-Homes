@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom'; // Import Link
+import { Link } from 'react-router-dom';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Autoplay, Pagination, Navigation } from 'swiper/modules';
 
-// Import Swiper styles
 import 'swiper/css';
 import 'swiper/css/pagination';
 import 'swiper/css/navigation';
@@ -14,41 +13,24 @@ import PropertyDetailsModal from '../components/PropertyDetailsModal';
 import { supabase } from '../lib/supabaseClient'; 
 
 export default function Home() {
-  // ------------------------------------------
-  // STATE & DATA
-  // ------------------------------------------
-  
-  // Hero Slides State
   const [heroSlides, setHeroSlides] = useState([]);
   const [loadingSlides, setLoadingSlides] = useState(true);
-
-  // Featured Properties State
   const [featuredProperties, setFeaturedProperties] = useState([]);
   const [loadingProperties, setLoadingProperties] = useState(true);
-
-  // MODAL STATE
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState(null);
-
-  // ------------------------------------------
-  // SIDE EFFECTS
-  // ------------------------------------------
   
   useEffect(() => {
     fetchHeroSlides();
     fetchFeaturedProperties();
   }, []);
 
-  // ------------------------------------------
-  // FUNCTIONS
-  // ------------------------------------------
-
   const fetchHeroSlides = async () => {
     try {
       const { data, error } = await supabase
         .from('properties')
         .select('id, title, location, price, image_url')
-        .eq('featured', 'true') // Check for string 'true'
+        .eq('featured', 'true')
         .eq('status', 'active')
         .order('created_at', { ascending: false })
         .limit(5);
@@ -76,16 +58,13 @@ export default function Home() {
       const { data, error } = await supabase
         .from('properties')
         .select('*') 
-        .eq('featured', 'true') // Check for string 'true'
+        .eq('featured', 'true')
         .eq('status', 'active')
         .order('created_at', { ascending: false })
         .limit(6); 
 
       if (error) throw error;
-
-      if (data) {
-        setFeaturedProperties(data);
-      }
+      if (data) setFeaturedProperties(data);
     } catch (error) {
       console.error('Error fetching featured properties:', error.message);
     } finally {
@@ -93,21 +72,16 @@ export default function Home() {
     }
   };
 
-  // HANDLER: Open Modal
   const handleViewDetails = (property) => {
     setSelectedProperty(property);
     setIsModalOpen(true);
   };
 
-  // HANDLER: Close Modal
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setSelectedProperty(null);
   };
 
-  // ------------------------------------------
-  // RENDER
-  // ------------------------------------------
   return (
     <main>
       
@@ -135,7 +109,6 @@ export default function Home() {
               </p>
 
               <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
-                {/* UPDATED: Link to /find-houses */}
                 <Link to="/find-houses">
                   <GradientButton size="lg">
                     <i className="fas fa-search mr-2"></i> Start Your Search
@@ -214,7 +187,6 @@ export default function Home() {
           )}
           
           <div className="text-center mt-12">
-            {/* UPDATED: Link to /find-houses */}
             <Link to="/find-houses">
               <GradientButton size="lg">
                 <i className="fas fa-th-large mr-2"></i> View All Listings
@@ -223,6 +195,78 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* --- RENTAL MANAGEMENT SYSTEM ADVERT --- */}
+      <section className="py-20 bg-gradient-to-br from-indigo-900 via-purple-900 to-indigo-800 relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-96 h-96 bg-purple-500 opacity-10 rounded-full filter blur-3xl"></div>
+        <div className="absolute bottom-0 right-0 w-96 h-96 bg-indigo-500 opacity-10 rounded-full filter blur-3xl"></div>
+        
+        <div className="container mx-auto px-6 relative z-10">
+          <div className="flex flex-col lg:flex-row items-center justify-between gap-12">
+            
+            <div className="lg:w-1/2 text-center lg:text-left">
+              <span className="inline-block bg-white/10 backdrop-blur-sm text-purple-200 text-sm font-bold px-4 py-2 rounded-full border border-white/20 mb-6 uppercase tracking-wider">
+                For Landlords & Agents
+              </span>
+              <h2 className="text-3xl md:text-5xl font-bold text-white mb-4 leading-tight">
+                Automate Your Rental Business
+              </h2>
+              <p className="text-lg text-indigo-100 mb-8 leading-relaxed max-w-xl">
+                Manage properties, track tenant payment history, and automate invoices seamlessly with our Rental Management System.
+              </p>
+
+              {/* Pricing Box */}
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-6 mb-8 inline-block mx-auto lg:mx-0">
+                <div className="flex items-end justify-center lg:justify-start gap-2 mb-2">
+                  <span className="text-sm text-indigo-200 line-through">Standard Rates</span>
+                  <span className="bg-emerald-500 text-white text-xs font-bold px-2 py-1 rounded uppercase">1 Month Free</span>
+                </div>
+                <div className="flex items-baseline justify-center lg:justify-start">
+                  <span className="text-4xl font-extrabold text-white">KES 1,199</span>
+                  <span className="text-indigo-200 ml-2 font-medium">/ property / month</span>
+                </div>
+                <p className="text-xs text-indigo-300 mt-2">First month free on your first subscription.</p>
+              </div>
+              
+              <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
+                <a 
+                  href="https://keja-zetu-rentals.vercel.app/" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center bg-white text-indigo-700 font-bold py-3 px-8 rounded-xl shadow-lg hover:bg-indigo-50 transition-all transform hover:scale-105"
+                >
+                  Subscribe Now
+                  <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
+                </a>
+              </div>
+            </div>
+
+            <div className="lg:w-1/2 w-full">
+              <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/20 shadow-2xl">
+                <div className="bg-gray-900 rounded-xl overflow-hidden">
+                   <div className="bg-gray-800 px-4 py-3 flex items-center space-x-2 border-b border-gray-700">
+                     <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                     <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                     <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                     <span className="ml-4 text-xs text-gray-400 font-mono">dashboard.rentals.app</span>
+                   </div>
+                   <div className="p-6 space-y-4">
+                      <div className="h-4 bg-gray-700 rounded w-1/3"></div>
+                      <div className="grid grid-cols-3 gap-4 mt-6">
+                         <div className="h-20 bg-indigo-500/30 rounded-lg border border-indigo-400/30"></div>
+                         <div className="h-20 bg-purple-500/30 rounded-lg border border-purple-400/30"></div>
+                         <div className="h-20 bg-pink-500/30 rounded-lg border border-pink-400/30"></div>
+                      </div>
+                      <div className="h-32 bg-gray-800 rounded-lg mt-4"></div>
+                   </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+      {/* --- END ADVERT SECTION --- */}
 
       {/* PROPERTY DETAILS MODAL */}
       {selectedProperty && (

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "../lib/supabaseClient";
-import { counties, constituencies } from "../data/locations"; // Import location data
+import { counties, constituencies } from "../data/locations";
 import PropertyCard from "../components/PropertyCard";
 import PropertyDetailsModal from "../components/PropertyDetailsModal";
 
@@ -10,7 +10,6 @@ export default function FindHouses() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // --- Filter State ---
   const [filters, setFilters] = useState({
     searchQuery: "",
     minPrice: "",
@@ -18,11 +17,10 @@ export default function FindHouses() {
     type: "All",
     bedrooms: "Any",
     bathrooms: "Any",
-    county: "All",      // NEW
-    constituency: "All" // NEW
+    county: "All",
+    constituency: "All"
   });
 
-  // Dynamic options for constituency dropdown
   const [constituencyOptions, setConstituencyOptions] = useState([]);
 
   useEffect(() => {
@@ -47,18 +45,16 @@ export default function FindHouses() {
     }
   };
 
-  // --- Filtering Logic ---
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
     
-    // Special handling for County -> update Constituency list
     if (name === 'county') {
       const constits = value && value !== 'All' ? constituencies[value] : [];
       setConstituencyOptions(constits);
       setFilters(prev => ({ 
         ...prev, 
         county: value, 
-        constituency: "All" // Reset constituency when county changes
+        constituency: "All"
       }));
     } else {
       setFilters(prev => ({ ...prev, [name]: value }));
@@ -66,7 +62,6 @@ export default function FindHouses() {
   };
 
   const filteredProperties = properties.filter((p) => {
-    // 1. Search Query
     if (filters.searchQuery) {
       const query = filters.searchQuery.toLowerCase();
       const titleMatch = p.title?.toLowerCase().includes(query);
@@ -74,24 +69,14 @@ export default function FindHouses() {
       if (!titleMatch && !locationMatch) return false;
     }
 
-    // 2. Price
     const price = parseFloat(p.price);
     if (filters.minPrice && price < parseFloat(filters.minPrice)) return false;
     if (filters.maxPrice && price > parseFloat(filters.maxPrice)) return false;
 
-    // 3. Type
     if (filters.type !== "All" && p.type !== filters.type) return false;
-
-    // 4. Bedrooms
     if (filters.bedrooms !== "Any" && p.bedrooms < parseInt(filters.bedrooms)) return false;
-
-    // 5. Bathrooms
     if (filters.bathrooms !== "Any" && p.bathrooms < parseInt(filters.bathrooms)) return false;
-
-    // 6. County (NEW)
     if (filters.county !== "All" && p.county !== filters.county) return false;
-
-    // 7. Constituency (NEW)
     if (filters.constituency !== "All" && p.constituency !== filters.constituency) return false;
 
     return true;
@@ -118,7 +103,6 @@ export default function FindHouses() {
         {/* --- Filter UI --- */}
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 mb-8 space-y-4">
           
-          {/* Search Bar */}
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
               <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
@@ -133,10 +117,7 @@ export default function FindHouses() {
             />
           </div>
 
-          {/* Filter Grid */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            
-            {/* County Filter */}
             <div>
               <label className="block text-xs font-semibold text-gray-500 mb-1">County</label>
               <select
@@ -150,7 +131,6 @@ export default function FindHouses() {
               </select>
             </div>
 
-            {/* Constituency Filter */}
             <div>
               <label className="block text-xs font-semibold text-gray-500 mb-1">Constituency</label>
               <select
@@ -165,7 +145,6 @@ export default function FindHouses() {
               </select>
             </div>
 
-            {/* Type Filter */}
             <div>
               <label className="block text-xs font-semibold text-gray-500 mb-1">Property Type</label>
               <select
@@ -183,7 +162,6 @@ export default function FindHouses() {
               </select>
             </div>
 
-            {/* Bedrooms */}
             <div>
               <label className="block text-xs font-semibold text-gray-500 mb-1">Bedrooms</label>
               <select
@@ -201,7 +179,6 @@ export default function FindHouses() {
             </div>
           </div>
           
-          {/* Price Range Row */}
            <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-semibold text-gray-500 mb-1">Min Price (KES)</label>
@@ -226,6 +203,29 @@ export default function FindHouses() {
                 />
               </div>
             </div>
+        </div>
+
+        {/* --- RENTAL MANAGEMENT BANNER --- */}
+        <div className="mb-8 bg-gradient-to-r from-indigo-600 to-purple-700 rounded-2xl p-6 text-white shadow-lg flex flex-col md:flex-row items-center justify-between">
+            <div className="mb-4 md:mb-0 flex items-center">
+                <div className="bg-white/20 p-3 rounded-xl mr-4 hidden sm:block">
+                    <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                    </svg>
+                </div>
+                <div>
+                    <h3 className="text-lg md:text-xl font-bold">Are you a Landlord?</h3>
+                    <p className="text-sm text-indigo-100">Automate your rent for <span className="font-bold">KES 1,199/mo</span>. Get 1 Month Free!</p>
+                </div>
+            </div>
+            <a 
+                href="https://keja-zetu-rentals.vercel.app/" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="flex-shrink-0 bg-white text-indigo-700 font-bold py-2.5 px-6 rounded-xl shadow-md hover:bg-indigo-50 transition-colors text-sm"
+            >
+                Subscribe Now
+            </a>
         </div>
 
         <div className="flex justify-between items-center mb-6">
