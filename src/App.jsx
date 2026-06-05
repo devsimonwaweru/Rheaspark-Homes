@@ -15,12 +15,12 @@ import MoversPage from "./pages/MoversPage";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import UserDashboard from "./pages/UserDashboard";
-import SubscriptionPage from "./pages/SubscriptionPage"; // Updated Import
+import SubscriptionPage from "./pages/SubscriptionPage";
 
 // Landlord Pages
 import LandlordDashboard from "./pages/LandlordDashboard";
 import LandlordHome from "./pages/LandlordHome";
-import LandlordRentals from "./pages/LandlordRentals"; 
+import LandlordRentals from "./pages/LandlordRentals"; // Tenants Page
 import LandlordProperties from "./pages/LandlordProperties"; 
 import LandlordRequests from "./pages/LandlordRequests"; 
 import LandlordPayments from "./pages/LandlordPayments"; 
@@ -37,6 +37,9 @@ import AdminUsers from "./pages/AdminUsers";
 import AdminLandlords from "./pages/AdminLandlords";
 import AdminProperties from "./pages/AdminProperties";
 import AdminMovers from "./pages/AdminMovers";
+
+// NEW: Import JoinPage
+import JoinPage from "./pages/JoinPage";
 
 // ---------------- PUBLIC LAYOUT ----------------
 const PublicLayout = ({ children }) => (
@@ -86,21 +89,22 @@ function App() {
 
         {/* USER */}
         <Route path="/user/dashboard" element={session ? <UserDashboard /> : <Navigate to="/login" replace />} />
-        
-        {/* SUBSCRIPTION PAGE (Standalone, no header/footer) */}
-        <Route 
-          path="/subscribe" 
-          element={session ? <SubscriptionPage /> : <Navigate to="/login" replace />} 
-        />
+        <Route path="/subscribe" element={session ? <SubscriptionPage /> : <Navigate to="/login" replace />} />
+
+        {/* NEW: PUBLIC JOIN LINK (No Header/Footer) */}
+        <Route path="/join/:code" element={<JoinPage />} />
 
         {/* LANDLORD MANAGEMENT SUITE */}
         <Route path="/landlord/*" element={session ? <LandlordDashboard /> : <Navigate to="/login" replace />}>
           <Route index element={<LandlordHome />} />
-          <Route path="properties" element={<LandlordProperties />} />
-          <Route path="requests" element={<LandlordRequests />} />
+          
+          {/* Pro Features */}
           <Route path="rentals" element={<LandlordRentals />} />
           <Route path="payments" element={<LandlordPayments />} />
           <Route path="maintenance" element={<LandlordMaintenance />} />
+          
+          <Route path="properties" element={<LandlordProperties />} />
+          <Route path="requests" element={<LandlordRequests />} />
           <Route path="messages" element={<LandlordHome status="coming_soon" />} />
           <Route path="settings" element={<LandlordHome status="coming_soon" />} />
         </Route>

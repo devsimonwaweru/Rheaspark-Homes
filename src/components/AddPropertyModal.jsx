@@ -2,7 +2,7 @@
 // src/components/AddPropertyModal.jsx
 import React, { useState, useEffect } from "react";
 import { supabase } from "../lib/supabaseClient";
-import { counties, constituencies } from "../data/locations"; // Import fixed data
+import { counties, constituencies } from "../data/locations";
 
 // --- Sanity Configuration ---
 const SANITY_PROJECT_ID = import.meta.env.VITE_SANITY_PROJECT_ID;
@@ -69,10 +69,9 @@ export default function AddPropertyModal({ isOpen, onClose }) {
   
   const [imageFiles, setImageFiles] = useState([]);
 
-  // New state for Smart Units
+  // Simplified State for Units
   const [enableUnits, setEnableUnits] = useState(false);
-  const [unitInput, setUnitInput] = useState("");
-  const [suggestion, setSuggestion] = useState(null);
+  const [unitCount, setUnitCount] = useState(1);
 
   const [formData, setFormData] = useState({
     title: "", type: "Apartment", description: "",
@@ -216,69 +215,6 @@ export default function AddPropertyModal({ isOpen, onClose }) {
   const nextStep = () => setStep(prev => prev + 1);
   const prevStep = () => setStep(prev => prev - 1);
 
-  // --- SMART UNIT LOGIC ---
-
-  const handleUnitChange = (e) => {
-    const val = e.target.value;
-    setUnitInput(val);
-    analyzePattern(val);
-  };
-
-  const analyzePattern = (input) => {
-    const lines = input.split('\n').filter(l => l.trim() !== '');
-    if (lines.length < 2) {
-      setSuggestion(null);
-      return;
-    }
-
-    // Regex to find Prefix + Number (e.g., A1, Room 2, Block B-10)
-    const regex = /^(.*?)(\d+)$/;
-    const parsed = lines.map(line => {
-      const match = line.trim().match(regex);
-      if (match) {
-        return {
-          original: line.trim(),
-          prefix: match[1], // "A" or "Room "
-          number: parseInt(match[2]) // 1, 2, 10
-        };
-      }
-      return null;
-    }).filter(Boolean);
-
-    // Do all lines match the pattern?
-    if (parsed.length < 2) {
-      setSuggestion(null);
-      return;
-    }
-
-    const firstPrefix = parsed[0].prefix;
-    const hasCommonPrefix = parsed.every(p => p.prefix === firstPrefix);
-
-    if (hasCommonPrefix) {
-      const maxNum = Math.max(...parsed.map(p => p.number));
-      setSuggestion({
-        prefix: firstPrefix,
-        lastNumber: maxNum,
-        message: `Pattern detected: "${firstPrefix}[Number]". Generate up to ${firstPrefix}${maxNum + 5}?`
-      });
-    } else {
-      setSuggestion(null);
-    }
-  };
-
-  const autoFillUnits = () => {
-    if (!suggestion) return;
-    const { prefix, lastNumber } = suggestion;
-    const targetCount = lastNumber + 5; // Add 5 more
-    
-    let newLines = [...unitInput.split('\n')];
-    for (let i = lastNumber + 1; i <= targetCount; i++) {
-      newLines.push(`${prefix}${i}`);
-    }
-    setUnitInput(newLines.join('\n'));
-    setSuggestion(null); // Hide suggestion after applying
-  };
-
   // --- SUBMISSION ---
 
   const uploadToSanity = async (file) => {
@@ -334,14 +270,17 @@ export default function AddPropertyModal({ isOpen, onClose }) {
 
       if (insertError) throw insertError;
 
-      // 4. Insert Units (if enabled)
-      if (enableUnits && unitInput.trim() !== '') {
-        const lines = unitInput.split('\n').filter(l => l.trim() !== '');
-        const unitsToInsert = lines.map(name => ({
-          property_id: newProperty.id,
-          unit_name: name.trim(),
-          status: 'vacant'
-        }));
+      // 4. Insert Units (if enabled) - AUTO-SETTING RENT
+      if (enableUnits && unitCount > 0) {
+        const unitsToInsert = [];
+        for (let i = 1; i <= unitCount; i++) {
+          unitsToInsert.push({
+            property_id: newProperty.id,
+            unit_name: `Unit ${i}`,
+            status: 'vacant',
+            monthly_rent: propertyData.price // <--- AUTO-FILL RENT FROM PROPERTY PRICE
+          });
+        }
 
         const { error: unitError } = await supabase
           .from('units')
@@ -467,7 +406,7 @@ export default function AddPropertyModal({ isOpen, onClose }) {
           </div>
         );
 
-      // --- NEW STEP 3: SMART UNITS ---
+      // --- UPDATED STEP 3: SIMPLIFIED UNITS ---
       case 3:
         return (
           <div className="space-y-5 animate-fade-in">
@@ -476,46 +415,33 @@ export default function AddPropertyModal({ isOpen, onClose }) {
               <label className="relative inline-flex items-center cursor-pointer">
                 <input type="checkbox" checked={enableUnits} onChange={() => setEnableUnits(!enableUnits)} className="sr-only peer" />
                 <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-100 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
-                <span className="ml-3 text-sm font-medium text-gray-600">Multi-Unit / Rental Manager</span>
+                <span className="ml-3 text-sm font-medium text-gray-600">Multi-Unit Property</span>
               </label>
             </div>
 
             {enableUnits ? (
               <div className="space-y-4">
-                <p className="text-sm text-gray-500">Enter unit names below. The system will auto-detect patterns.</p>
+                <p className="text-sm text-gray-500">
+                  Enter the number of units. We will automatically generate unit names (e.g., Unit 1, Unit 2) and set the rent to KES {formData.price ? parseFloat(formData.price).toLocaleString() : '0'}.
+                </p>
                 
-                <div className="relative">
-                  <textarea 
-                    rows={8}
-                    value={unitInput}
-                    onChange={handleUnitChange}
-                    placeholder="Example:&#10;A1&#10;A2&#10;A3&#10;...or Room 1, Room 2"
-                    className="w-full border-2 border-purple-200 focus:border-purple-500 focus:ring-purple-100 rounded-xl px-4 py-3 focus:ring-2 outline-none font-mono text-sm bg-purple-50/30"
-                  />
+                <Input 
+                  label="Number of Units" 
+                  name="unitCount" 
+                  type="number" 
+                  value={unitCount} 
+                  onChange={(e) => setUnitCount(parseInt(e.target.value) || 1)} 
+                  placeholder="e.g. 5" 
+                  color="purple" 
+                />
+
+                <div className="text-xs text-gray-400 bg-purple-50 p-3 rounded-lg border border-purple-100">
+                  {unitCount > 0 ? (
+                    <span>Creating: <strong>Unit 1</strong> to <strong>Unit {unitCount}</strong></span>
+                  ) : (
+                    <span>Please enter a valid number.</span>
+                  )}
                 </div>
-
-                {/* AI Suggestion Box */}
-                {suggestion && (
-                  <div className="bg-indigo-50 border border-indigo-200 p-4 rounded-xl text-sm flex items-center justify-between animate-fade-in">
-                    <div className="flex items-center text-indigo-700">
-                      <svg className="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-                      <span>{suggestion.message}</span>
-                    </div>
-                    <button 
-                      type="button"
-                      onClick={autoFillUnits}
-                      className="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold ml-4 whitespace-nowrap hover:bg-indigo-700"
-                    >
-                      Auto-fill
-                    </button>
-                  </div>
-                )}
-
-                {unitInput.length > 0 && (
-                   <div className="text-xs text-gray-400 text-right">
-                     {unitInput.split('\n').filter(l => l.trim()).length} units detected
-                   </div>
-                )}
               </div>
             ) : (
               <div className="text-center py-8 bg-gray-50 rounded-xl border border-dashed border-gray-200">

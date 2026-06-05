@@ -28,9 +28,16 @@ export default function LandlordHome() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    const { data: landlordProfile } = await supabase.from('landlords').select('*').eq('id', user.id).single();
+    // 1. Fetch Profile
+    const { data: landlordProfile } = await supabase
+      .from('landlords')
+      .select('*')
+      .eq('id', user.id)
+      .single();
+    
     setProfile(landlordProfile);
 
+    // 2. Fetch Properties with Units
     const { data: propsData } = await supabase
       .from('properties')
       .select(`*, units ( id, unit_name, status, monthly_rent )`)
@@ -85,6 +92,7 @@ export default function LandlordHome() {
   };
 
   const stats = getStats();
+  // Check Pro Status
   const isPro = profile?.subscription_status === 'active';
 
   if (loading) {
@@ -101,7 +109,7 @@ export default function LandlordHome() {
   return (
     <div className="p-4 md:p-8 relative bg-gray-50/50 min-h-screen">
       
-      {/* Modern Header */}
+      {/* Header */}
       <div className="relative overflow-hidden bg-white rounded-3xl shadow-sm border border-gray-100 p-8 mb-8">
         <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-blue-100 to-transparent rounded-full -mr-32 -mt-32 opacity-50"></div>
         <div className="relative z-10">
@@ -117,9 +125,8 @@ export default function LandlordHome() {
       {/* --- CONDITIONAL SECTIONS --- */}
       
       {!isPro ? (
-        /* --- COOL MARKETING JUMBOTRON --- */
+        /* --- MARKETING JUMBOTRON --- */
         <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-900 via-purple-900 to-indigo-800 p-8 md:p-12 shadow-2xl mb-8 border border-indigo-700/50">
-          {/* Decorative Elements */}
           <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-500 rounded-full filter blur-3xl opacity-20 -mr-48 -mt-48"></div>
           <div className="absolute bottom-0 left-0 w-64 h-64 bg-purple-500 rounded-full filter blur-3xl opacity-20 -ml-32 -mb-32"></div>
           
@@ -127,7 +134,7 @@ export default function LandlordHome() {
             <div className="text-center lg:text-left max-w-xl">
               <span className="inline-flex items-center bg-white/10 text-purple-200 text-xs font-bold px-3 py-1 rounded-full border border-white/20 mb-4 backdrop-blur-sm">
                 <svg className="w-3 h-3 mr-1.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
-                LIMITED OFFER
+                1 MONTH FREE TRIAL
               </span>
               <h2 className="text-3xl md:text-4xl font-extrabold text-white mb-4 leading-tight">
                 Automate Your Rentals.<br />Save Time & Money.
@@ -144,7 +151,6 @@ export default function LandlordHome() {
               </Link>
             </div>
             
-            {/* Visual Feature List */}
             <div className="grid grid-cols-1 gap-4 w-full lg:w-auto">
                <div className="bg-white/10 backdrop-blur-sm p-4 rounded-xl border border-white/10 flex items-center space-x-4">
                  <div className="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -170,7 +176,6 @@ export default function LandlordHome() {
       ) : (
         /* --- PRO STATS GRID --- */
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          {/* Card 1: Properties */}
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center space-x-4 hover:shadow-md transition-shadow">
             <div className="w-14 h-14 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600">
               <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
@@ -181,7 +186,6 @@ export default function LandlordHome() {
             </div>
           </div>
 
-          {/* Card 2: Occupancy */}
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center space-x-4 hover:shadow-md transition-shadow">
             <div className="w-14 h-14 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600">
               <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
@@ -192,7 +196,6 @@ export default function LandlordHome() {
             </div>
           </div>
 
-          {/* Card 3: Projected Income */}
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center space-x-4 hover:shadow-md transition-shadow">
             <div className="w-14 h-14 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600">
               <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
@@ -264,7 +267,6 @@ export default function LandlordHome() {
                     )}
                   </div>
                   
-                  {/* Pro Unit Stats Bar */}
                   {isPro && unitCount > 0 && (
                     <div className="mb-4">
                       <div className="flex justify-between text-xs text-gray-500 mb-1">
@@ -297,7 +299,6 @@ export default function LandlordHome() {
         </div>
       )}
 
-      {/* Edit Modal */}
       <EditPropertyModal 
         isOpen={isEditModalOpen}
         onClose={() => setIsEditModalOpen(false)}

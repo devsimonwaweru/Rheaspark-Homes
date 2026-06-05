@@ -9,21 +9,36 @@ export default function LandlordSidebar({ onAddProperty }) {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Fetch Profile to check subscription status
+  // Fetch Profile & Check Subscription Expiry
   useEffect(() => {
     const getProfile = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         const { data } = await supabase
           .from('landlords')
-          .select('full_name, business_name, subscription_status')
+          .select('full_name, business_name, subscription_status, subscription_ends_at')
           .eq('id', user.id)
           .single();
-        setProfile(data);
+        
+        if (data) {
+          // Check if subscription has expired locally
+          if (data.subscription_status === 'active' && data.subscription_ends_at) {
+            const now = new Date();
+            const end = new Date(data.subscription_ends_at);
+            if (now > end) {
+              // Subscription expired
+              setProfile({ ...data, subscription_status: 'inactive' });
+            } else {
+              setProfile(data);
+            }
+          } else {
+            setProfile(data);
+          }
+        }
       }
     };
     getProfile();
-  }, []);
+  }, [location]); // Re-check on location change to refresh state after subscription
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -142,10 +157,7 @@ export default function LandlordSidebar({ onAddProperty }) {
             ) : (
               /* --- FREE USER: MARKETING BANNER --- */
               <div className="mt-6 relative">
-                {/* Glowing Background Effect */}
                 <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-indigo-500 rounded-2xl blur-xl opacity-30 animate-pulse"></div>
-                
-                {/* Card Content */}
                 <div className="relative bg-white border border-gray-100 p-5 rounded-2xl shadow-xl">
                   <div className="flex flex-col items-center text-center">
                     <div className="w-12 h-12 bg-indigo-50 rounded-full flex items-center justify-center mb-3 ring-4 ring-indigo-100">
@@ -155,8 +167,6 @@ export default function LandlordSidebar({ onAddProperty }) {
                     <p className="text-[11px] text-gray-500 mb-4 leading-relaxed">
                       Automate rent, track tenants, and generate reports.
                     </p>
-                    
-                    {/* Link to the new Subscription Page */}
                     <Link 
                       to="/subscribe" 
                       onClick={() => setIsOpen(false)}
