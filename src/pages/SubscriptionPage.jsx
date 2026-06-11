@@ -104,6 +104,7 @@ export default function SubscriptionPage() {
           body: JSON.stringify({ 
             phone: phone, 
             amount: 1199, // The price per property/month
+            type: "subscription", // FIX: Added type to prevent 500 error
             userId: user.id 
           }),
         }

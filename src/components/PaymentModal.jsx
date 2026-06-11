@@ -1,10 +1,12 @@
+// src/components/PaymentModal.jsx
 import React, { useState, useEffect, useRef } from "react";
 import { supabase } from "../lib/supabaseClient";
 
 export default function PaymentModal({ isOpen, onClose, amount, type, propertyId }) {
   const [phone, setPhone] = useState("");
   const [status, setStatus] = useState("idle"); // idle | loading | pending | success | failed
-  const [, setPaymentId] = useState(null);
+  // eslint-disable-next-line no-unused-vars
+  const [paymentId, setPaymentId] = useState(null);
   const [message, setMessage] = useState("");
   const pollingRef = useRef(null);
 
@@ -34,37 +36,54 @@ export default function PaymentModal({ isOpen, onClose, amount, type, propertyId
     setMessage("");
 
     try {
-      // FIX: Explicit session check
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         throw new Error("Session expired. Please log in again.");
       }
 
-      // Call Supabase Edge Function
       const { data, error: funcError } = await supabase.functions.invoke('initiate-payment', {
         body: { 
           phone, 
           type, 
           property_id: propertyId,
+          amount: amount, 
           userId: session.user.id 
         }
       });
 
-      if (funcError) throw funcError;
+      // ROBUST ERROR HANDLING
+      if (funcError) {
+        // Try to parse JSON from the error context, fallback to generic message
+        let errorMessage = "Server error. Please check console or try again.";
+        
+        if (funcError.context) {
+          try {
+            // Clone response to read safely
+            const errorData = await funcError.context.clone().json();
+            errorMessage = errorData.error || errorMessage;
+          // eslint-disable-next-line no-unused-vars
+          } catch (parseError) {
+            // If parsing fails, it means server returned HTML (500), use generic message
+            console.error("Server returned non-JSON response (likely 500 error)");
+          }
+        }
+        
+        throw new Error(errorMessage);
+      }
+
       if (data?.error) throw new Error(data.error);
 
-      // Move to Pending State
+      // Success
       setPaymentId(data.payment_id);
       setStatus("pending");
       setMessage("STK Push sent! Please check your phone...");
       
-      // Start Polling
       if (data.payment_id) {
         startPolling(data.payment_id);
       }
 
     } catch (err) {
-      console.error(err);
+      console.error("Payment Initiation Failed:", err);
       setStatus("failed");
       setMessage(err.message || "Failed to initiate payment");
     }
@@ -106,18 +125,15 @@ export default function PaymentModal({ isOpen, onClose, amount, type, propertyId
   if (!isOpen) return null;
 
   return (
-    // FIX: Changed z-50 to z-[200] so it sits ABOVE the PropertyDetailsModal (which is z-[100])
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
       <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden animate-scale-in">
         
-        {/* Header */}
         <div className="p-6 bg-gradient-to-r from-blue-600 to-emerald-500 text-white">
           <h2 className="text-xl font-bold">Secure Payment</h2>
           <p className="text-sm opacity-90">Powered by Intasend</p>
         </div>
 
         <div className="p-8">
-          {/* State: Idle / Input */}
           {status === "idle" || status === "loading" ? (
             <form onSubmit={handleInitiate} className="space-y-6">
               <div className="text-center">
@@ -161,7 +177,6 @@ export default function PaymentModal({ isOpen, onClose, amount, type, propertyId
             </form>
           ) : null}
 
-          {/* State: Pending (Processing) */}
           {status === "pending" && (
             <div className="text-center py-10 space-y-4">
               <div className="w-20 h-20 mx-auto rounded-full bg-blue-50 flex items-center justify-center animate-pulse">
@@ -180,7 +195,6 @@ export default function PaymentModal({ isOpen, onClose, amount, type, propertyId
             </div>
           )}
 
-          {/* State: Success */}
           {status === "success" && (
             <div className="text-center py-10 space-y-4">
               <div className="w-20 h-20 mx-auto rounded-full bg-green-100 flex items-center justify-center">
@@ -193,7 +207,6 @@ export default function PaymentModal({ isOpen, onClose, amount, type, propertyId
             </div>
           )}
 
-          {/* State: Failed */}
           {status === "failed" && (
             <div className="text-center py-10 space-y-4">
               <div className="w-20 h-20 mx-auto rounded-full bg-red-100 flex items-center justify-center">
@@ -210,7 +223,6 @@ export default function PaymentModal({ isOpen, onClose, amount, type, propertyId
           )}
         </div>
 
-        {/* Close Button (Only if not pending) */}
         {status !== "pending" && (
           <div className="p-4 border-t text-center">
             <button onClick={() => onClose(false)} className="text-gray-500 hover:text-gray-800 text-sm font-medium">
