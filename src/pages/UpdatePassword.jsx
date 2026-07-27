@@ -10,7 +10,7 @@ export default function UpdatePassword() {
   const [success, setSuccess] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-  const [settingSession, setSettingSession] = useState(true); // Prevents form flash while checking tokens
+  const [settingSession, setSettingSession] = useState(true);
 
   // Parallax state
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
@@ -22,34 +22,28 @@ export default function UpdatePassword() {
     setMousePos({ x, y });
   };
 
-  // 1. EXTRACT TOKENS FROM URL ON MOUNT
+  // 1. GRAB TOKENS FROM SESSION STORAGE (Saved by App.jsx)
   useEffect(() => {
     const handleTokenExtraction = async () => {
-      const hash = window.location.hash;
-      
-      // Look for the second hash where Supabase hides the tokens: #access_token=...
-      const match = hash.match(/#access_token=([^&]*)/);
+      const accessToken = sessionStorage.getItem("reset_access_token");
+      const refreshToken = sessionStorage.getItem("reset_refresh_token");
 
-      if (match) {
-        // Extract the token string
-        const paramString = hash.substring(hash.indexOf('#access_token'));
-        const params = new URLSearchParams(paramString);
-        
-        // Manually set the session in Supabase
+      if (accessToken && refreshToken) {
+        // Apply the tokens to Supabase
         const { error: sessionError } = await supabase.auth.setSession({
-          access_token: params.get('access_token'),
-          refresh_token: params.get('refresh_token'),
+          access_token: accessToken,
+          refresh_token: refreshToken,
         });
+
+        // Clean up storage immediately
+        sessionStorage.removeItem("reset_access_token");
+        sessionStorage.removeItem("reset_refresh_token");
 
         if (sessionError) {
           setError("This reset link is invalid or has expired. Please request a new one.");
         }
-
-        // Clean up the ugly URL so the user doesn't see the tokens in their address bar
-        window.history.replaceState(null, null, window.location.pathname + '#/update-password');
-        
       } else {
-        // Fallback check if Supabase somehow caught it automatically
+        // Fallback check if session already exists
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) {
           setError("Authentication session missing. Please request a new password reset link.");
@@ -92,7 +86,7 @@ export default function UpdatePassword() {
     setLoading(false);
   };
 
-  // Show a clean loader while extracting tokens
+  // Show a clean loader while applying tokens
   if (settingSession) {
     return (
       <div className="min-h-screen flex bg-gray-50 font-sans">

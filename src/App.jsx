@@ -71,6 +71,23 @@ function App() {
 
   if (loading) return <div className="flex items-center justify-center min-h-screen text-gray-500">Loading...</div>;
 
+  // --- PASSWORD RESET INTERCEPTOR ---
+  // Because we use HashRouter, we force Supabase to send tokens via standard query params (?token=)
+  // so HashRouter doesn't break them. We catch them here before React Router loads.
+  if (typeof window !== "undefined") {
+    const searchParams = new URLSearchParams(window.location.search);
+    if (searchParams.has("access_token") && searchParams.get("type") === "recovery") {
+      
+      sessionStorage.setItem("reset_access_token", searchParams.get("access_token"));
+      sessionStorage.setItem("reset_refresh_token", searchParams.get("refresh_token"));
+      
+      // Clean up URL and send to the HashRouter page
+      window.location.replace("/#/update-password");
+      return null; 
+    }
+  }
+  // ---------------------------------
+
   return (
     <Router>
       <Routes>
@@ -101,12 +118,9 @@ function App() {
         {/* LANDLORD MANAGEMENT SUITE */}
         <Route path="/landlord/*" element={session ? <LandlordDashboard /> : <Navigate to="/login" replace />}>
           <Route index element={<LandlordHome />} />
-          
-          {/* Pro Features */}
           <Route path="rentals" element={<LandlordRentals />} />
           <Route path="payments" element={<LandlordPayments />} />
           <Route path="maintenance" element={<LandlordMaintenance />} />
-          
           <Route path="properties" element={<LandlordProperties />} />
           <Route path="requests" element={<LandlordRequests />} />
           <Route path="messages" element={<LandlordHome status="coming_soon" />} />
