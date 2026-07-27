@@ -42,16 +42,14 @@ export default function Login() {
     // 1. Check Landlord table
     const { data: landlord } = await supabase
       .from('landlords')
-      .select('id, subscription_status') // Fetch subscription_status
+      .select('id, subscription_status')
       .eq('id', user.id)
       .single();
 
     if (landlord) {
-      // REDIRECT LOGIC FOR LANDLORDS
       if (landlord.subscription_status === 'active') {
         navigate('/landlord');
       } else {
-        // If not subscribed, force them to subscription page
         navigate('/subscription');
       }
       setLoading(false);
@@ -84,7 +82,7 @@ export default function Login() {
       return;
     }
 
-    // 4. Fallback if no profile found (should ideally not happen if registration works)
+    // 4. Fallback if no profile found
     navigate('/');
     setLoading(false);
   };
@@ -189,9 +187,9 @@ export default function Login() {
                 <input type="checkbox" className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 transition" />
                 <span className="text-sm text-gray-600 group-hover:text-gray-800 transition-colors">Remember me</span>
               </label>
-              <a href="#" className="text-sm font-medium text-blue-600 hover:text-blue-500 hover:underline transition-colors">
+              <Link to="/forgot-password" className="text-sm font-medium text-blue-600 hover:text-blue-500 hover:underline transition-colors">
                 Forgot Password?
-              </a>
+              </Link>
             </div>
 
             <button

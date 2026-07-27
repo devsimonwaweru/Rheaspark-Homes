@@ -14,17 +14,19 @@ import FindHouses from "./pages/FindHouses";
 import MoversPage from "./pages/MoversPage";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import ForgotPassword from "./pages/ForgotPassword";
+import UpdatePassword from "./pages/UpdatePassword";
 import UserDashboard from "./pages/UserDashboard";
 import SubscriptionPage from "./pages/SubscriptionPage";
 
 // Landlord Pages
 import LandlordDashboard from "./pages/LandlordDashboard";
 import LandlordHome from "./pages/LandlordHome";
-import LandlordRentals from "./pages/LandlordRentals"; // Tenants Page
-import LandlordProperties from "./pages/LandlordProperties"; 
-import LandlordRequests from "./pages/LandlordRequests"; 
-import LandlordPayments from "./pages/LandlordPayments"; 
-import LandlordMaintenance from "./pages/LandlordMaintenance"; 
+import LandlordRentals from "./pages/LandlordRentals";
+import LandlordProperties from "./pages/LandlordProperties";
+import LandlordRequests from "./pages/LandlordRequests";
+import LandlordPayments from "./pages/LandlordPayments";
+import LandlordMaintenance from "./pages/LandlordMaintenance";
 
 // Mover & Admin Pages
 import MoverDashboard from "./pages/MoverDashboard";
@@ -76,6 +78,8 @@ function App() {
         {/* AUTH */}
         <Route path="/login" element={session ? <Navigate to="/" replace /> : <PublicLayout><Login /></PublicLayout>} />
         <Route path="/register" element={session ? <Navigate to="/" replace /> : <PublicLayout><Register /></PublicLayout>} />
+        <Route path="/forgot-password" element={session ? <Navigate to="/" replace /> : <PublicLayout><ForgotPassword /></PublicLayout>} />
+        <Route path="/update-password" element={<UpdatePassword />} />
 
         {/* ADMIN */}
         <Route path="/admin/login" element={<AdminLogin />} />
