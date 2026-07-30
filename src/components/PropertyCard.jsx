@@ -1,10 +1,11 @@
+// src/components/PropertyCard.jsx
+
 import React, { useState, useMemo } from "react";
 
-export default function PropertyCard({ property, onViewDetails }) {
+export default function PropertyCard({ property, onViewDetails, isFavorite, onToggleFavorite }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [imgError, setImgError] = useState(false);
 
-  // Parse images from DB
   const imageList = useMemo(() => {
     let sources = [];
     const rawData = property.images;
@@ -33,6 +34,18 @@ export default function PropertyCard({ property, onViewDetails }) {
 
   const hasImage = imageList.length > 0 && !imgError;
 
+  const getVerificationBadge = () => {
+    if (!property.last_verified_at) return null;
+    const daysSince = Math.floor((Date.now() - new Date(property.last_verified_at).getTime()) / (1000 * 60 * 60 * 24));
+    if (daysSince <= 7) return { bg: 'bg-emerald-500', text: daysSince === 0 ? '🟢 Verified Today' : `🟢 ${daysSince}d ago` };
+    if (daysSince <= 30) return { bg: 'bg-yellow-500', text: `🟡 ${daysSince}d ago` };
+    return { bg: 'bg-red-500', text: `🔴 ${daysSince}d ago` };
+  };
+
+  const badge = getVerificationBadge();
+  const available = property.available_units || 0;
+  const total = property.total_units || 1;
+
   const handleNext = (e) => {
     e.stopPropagation();
     setCurrentIndex((prev) => (prev + 1) % imageList.length);
@@ -41,6 +54,11 @@ export default function PropertyCard({ property, onViewDetails }) {
   const handlePrev = (e) => {
     e.stopPropagation();
     setCurrentIndex((prev) => (prev - 1 + imageList.length) % imageList.length);
+  };
+
+  const handleFavoriteClick = (e) => {
+    e.stopPropagation();
+    onToggleFavorite(property.id);
   };
 
   const amenitiesList = useMemo(() => {
@@ -91,13 +109,50 @@ export default function PropertyCard({ property, onViewDetails }) {
             <span className="text-xs font-medium uppercase tracking-wider">No Image Available</span>
           </div>
         )}
+
+        {/* OVERLAY TRUST INDICATORS */}
+        <div className="absolute top-3 left-3 flex flex-col items-start gap-1.5">
+          <div className="bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-semibold text-blue-700 shadow-sm">
+            {property.type}
+          </div>
+          {badge && (
+            <div className={`${badge.bg} text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-sm`}>
+              {badge.text}
+            </div>
+          )}
+        </div>
+
+        {/* FAVORITE HEART BUTTON */}
+        <button
+          onClick={handleFavoriteClick}
+          className="absolute top-3 right-3 w-9 h-9 flex items-center justify-center rounded-full shadow-md transition-all duration-200 hover:scale-110 z-10"
+          style={{ backgroundColor: isFavorite ? 'rgba(239, 68, 68, 0.9)' : 'rgba(255, 255, 255, 0.85)' }}
+          aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
+        >
+          <svg
+            className="w-5 h-5 transition-colors duration-200"
+            viewBox="0 0 24 24"
+            fill={isFavorite ? "white" : "none"}
+            stroke={isFavorite ? "white" : "#9ca3af"}
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+          </svg>
+        </button>
+
+        {available > 0 && (
+          <div className="absolute bottom-2 right-2 bg-black/70 backdrop-blur-sm text-white text-[10px] font-bold px-2.5 py-1 rounded-full">
+            {available}/{total} Units Left
+          </div>
+        )}
       </div>
 
       {/* Content */}
       <div className="p-5 flex flex-col flex-grow">
         <div className="flex justify-between items-start mb-2">
           <h3 className="text-lg font-bold text-gray-800 truncate flex-1 pr-2">{property.title}</h3>
-          <span className="bg-blue-50 text-blue-700 text-xs font-semibold px-2 py-1 rounded-full whitespace-nowrap">{property.status || "Available"}</span>
         </div>
 
         <p className="text-gray-500 text-sm mb-2 flex items-center gap-1 truncate">

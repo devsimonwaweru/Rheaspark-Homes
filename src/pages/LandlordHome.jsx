@@ -14,6 +14,15 @@ export default function LandlordHome() {
   
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState(null);
+  
+  // Verification Engine State
+  const [expandingId, setExpandingId] = useState(null);
+  const [verifyingId, setVerifyingId] = useState(null);
+  const [totalUnits, setTotalUnits] = useState(1);
+  const [availableUnits, setAvailableUnits] = useState(1);
+
+  // Africa's Talking SMS Test State
+  const [smsStatus, setSmsStatus] = useState({}); 
 
   useEffect(() => {
     loadData();
@@ -28,7 +37,6 @@ export default function LandlordHome() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    // 1. Fetch Profile
     const { data: landlordProfile } = await supabase
       .from('landlords')
       .select('*')
@@ -37,14 +45,16 @@ export default function LandlordHome() {
     
     setProfile(landlordProfile);
 
-    // 2. Fetch Properties with Units
     const { data: propsData } = await supabase
       .from('properties')
       .select(`*, units ( id, unit_name, status, monthly_rent )`)
       .eq('landlord_id', user.id)
       .order('created_at', { ascending: false });
 
-    if (propsData) setProperties(propsData);
+    // FIX: Set data directly. landlord_phone is already fetched via select('*')
+    if (propsData) {
+      setProperties(propsData);
+    }
     setLoading(false);
   };
 
@@ -75,6 +85,103 @@ export default function LandlordHome() {
     await supabase.from('properties').update({ status: newStatus }).eq('id', property.id);
   };
 
+  // --- LIVE SMS TRIGGER ---
+  const handleTestSMS = async (property) => {
+    // FIX: Check for the phone number from the property table
+    if (!property.landlord_phone) {
+      alert('This property is missing a phone number. Please edit the property and add a "Landlord Phone" to send SMS.');
+      return;
+    }
+
+    setSmsStatus(prev => ({ ...prev, [property.id]: 'loading' }));
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Not logged in.");
+      
+      const response = await fetch(`${supabase.supabaseUrl}/functions/v1/live-sms`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ 
+          phone: property.landlord_phone, 
+          title: property.title 
+        })
+      });
+
+      const rawText = await response.text();
+      let data;
+      
+      try {
+        data = JSON.parse(rawText);
+      } catch (e) {
+        throw new Error(`Server crashed. Raw response: ${rawText.substring(0, 100)}`);
+      }
+
+      if (data.success) {
+        setSmsStatus(prev => ({ ...prev, [property.id]: 'success' }));
+        setTimeout(() => setSmsStatus(prev => ({ ...prev, [property.id]: 'idle' })), 2000);
+      } else {
+        throw new Error(data.error || 'Failed to send SMS');
+      }
+    } catch (err) {
+      alert(`SMS Error: ${err.message}`);
+      setSmsStatus(prev => ({ ...prev, [property.id]: 'error' }));
+      setTimeout(() => setSmsStatus(prev => ({ ...prev, [property.id]: 'idle' })), 3000);
+    }
+  };
+
+  // --- VERIFICATION ENGINE LOGIC ---
+  
+  const handleOpenVerify = (property) => {
+    setExpandingId(property.id);
+    const total = property.units?.length || 1;
+    const available = property.units?.filter(u => u.status === 'vacant').length || 0;
+    setTotalUnits(total);
+    setAvailableUnits(available);
+  };
+
+  const handleVerify = async (id) => {
+    setVerifyingId(id);
+    
+    let newStatus = 'available';
+    if (availableUnits === 0) newStatus = 'fully_occupied';
+    else if (availableUnits < totalUnits) newStatus = 'few_units';
+
+    const { error } = await supabase
+      .from('properties')
+      .update({
+        total_units: totalUnits,
+        available_units: availableUnits,
+        availability_status: newStatus,
+        last_verified_at: new Date().toISOString(),
+        verification_due_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        verification_status: 'verified',
+        auto_hidden: false,
+        views_since_last_verified: 0,
+        sms_state: null
+      })
+      .eq('id', id);
+
+    if (!error) {
+      setExpandingId(null);
+      loadData();
+    }
+    setVerifyingId(null);
+  };
+
+  const getVerificationBadge = (p) => {
+    if (p.auto_hidden) return <span className="bg-red-100 text-red-700 px-2 py-0.5 text-[10px] rounded-full font-bold uppercase">🔴 Hidden</span>;
+    if (!p.last_verified_at) return <span className="bg-yellow-100 text-yellow-700 px-2 py-0.5 text-[10px] rounded-full font-bold uppercase">🟡 Unverified</span>;
+    
+    const daysSince = Math.floor((Date.now() - new Date(p.last_verified_at).getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (daysSince <= 7) return <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 text-[10px] rounded-full font-bold uppercase">🟢 {daysSince === 0 ? 'Today' : `${daysSince}d`}</span>;
+    if (daysSince <= 30) return <span className="bg-yellow-100 text-yellow-700 px-2 py-0.5 text-[10px] rounded-full font-bold uppercase">🟡 {daysSince}d</span>;
+    return <span className="bg-red-100 text-red-700 px-2 py-0.5 text-[10px] rounded-full font-bold uppercase">🔴 {daysSince}d</span>;
+  };
+
   const getStats = () => {
     let totalUnits = 0, occupiedUnits = 0, monthlyRentTarget = 0;
     properties.forEach(p => {
@@ -92,7 +199,11 @@ export default function LandlordHome() {
   };
 
   const stats = getStats();
-  // Check Pro Status
+  const needsAttention = properties.filter(p => 
+    p.auto_hidden || !p.last_verified_at || 
+    (Math.floor((Date.now() - new Date(p.last_verified_at).getTime()) / (1000 * 60 * 60 * 24)) > 7)
+  ).length;
+  
   const isPro = profile?.subscription_status === 'active';
 
   if (loading) {
@@ -122,10 +233,7 @@ export default function LandlordHome() {
         </div>
       </div>
 
-      {/* --- CONDITIONAL SECTIONS --- */}
-      
       {!isPro ? (
-        /* --- MARKETING JUMBOTRON --- */
         <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-900 via-purple-900 to-indigo-800 p-8 md:p-12 shadow-2xl mb-8 border border-indigo-700/50">
           <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-500 rounded-full filter blur-3xl opacity-20 -mr-48 -mt-48"></div>
           <div className="absolute bottom-0 left-0 w-64 h-64 bg-purple-500 rounded-full filter blur-3xl opacity-20 -ml-32 -mb-32"></div>
@@ -174,41 +282,62 @@ export default function LandlordHome() {
           </div>
         </div>
       ) : (
-        /* --- PRO STATS GRID --- */
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center space-x-4 hover:shadow-md transition-shadow">
-            <div className="w-14 h-14 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600">
-              <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center space-x-4 hover:shadow-md transition-shadow">
+              <div className="w-14 h-14 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600">
+                <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+              </div>
+              <div>
+                <h3 className="text-3xl font-extrabold text-gray-900">{properties.length}</h3>
+                <p className="text-sm text-gray-400 font-medium">Properties</p>
+              </div>
             </div>
-            <div>
-              <h3 className="text-3xl font-extrabold text-gray-900">{properties.length}</h3>
-              <p className="text-sm text-gray-400 font-medium">Total Properties</p>
+
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center space-x-4 hover:shadow-md transition-shadow">
+              <div className="w-14 h-14 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600">
+                <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+              </div>
+              <div>
+                <h3 className="text-3xl font-extrabold text-gray-900">{stats.occupiedUnits}<span className="text-lg text-gray-400 font-normal">/{stats.totalUnits}</span></h3>
+                <p className="text-sm text-gray-400 font-medium">Occupied</p>
+              </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center space-x-4 hover:shadow-md transition-shadow">
+              <div className="w-14 h-14 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600">
+                <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              </div>
+              <div>
+                <h3 className="text-2xl font-extrabold text-gray-900">KES {stats.monthlyRentTarget.toLocaleString()}</h3>
+                <p className="text-sm text-gray-400 font-medium">Monthly Rent</p>
+              </div>
+            </div>
+
+            <div className={`p-6 rounded-2xl shadow-sm border flex items-center space-x-4 hover:shadow-md transition-shadow ${needsAttention > 0 ? 'bg-amber-50 border-amber-200' : 'bg-white border-gray-100'}`}>
+              <div className={`w-14 h-14 rounded-xl flex items-center justify-center ${needsAttention > 0 ? 'bg-amber-100 text-amber-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              </div>
+              <div>
+                <h3 className="text-3xl font-extrabold text-gray-900">{needsAttention}</h3>
+                <p className="text-sm text-gray-500 font-medium">Need Attention</p>
+              </div>
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center space-x-4 hover:shadow-md transition-shadow">
-            <div className="w-14 h-14 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600">
-              <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+          {needsAttention > 0 && (
+            <div className="mb-8 bg-amber-50 border border-amber-200 text-amber-800 px-5 py-4 rounded-2xl flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">⚠️</span>
+                <p className="text-sm font-medium">
+                  You have <span className="font-bold text-amber-900">{needsAttention} listing{needsAttention > 1 ? 's' : ''}</span> that are unverified or expired. Update them below to keep them visible to tenants.
+                </p>
+              </div>
             </div>
-            <div>
-              <h3 className="text-3xl font-extrabold text-gray-900">{stats.occupiedUnits}<span className="text-lg text-gray-400 font-normal">/{stats.totalUnits}</span></h3>
-              <p className="text-sm text-gray-400 font-medium">Units Occupied</p>
-            </div>
-          </div>
-
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center space-x-4 hover:shadow-md transition-shadow">
-            <div className="w-14 h-14 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600">
-              <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-            </div>
-            <div>
-              <h3 className="text-3xl font-extrabold text-gray-900">KES {stats.monthlyRentTarget.toLocaleString()}</h3>
-              <p className="text-sm text-gray-400 font-medium">Projected Monthly</p>
-            </div>
-          </div>
-        </div>
+          )}
+        </>
       )}
 
-      {/* Properties List */}
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-bold text-gray-800">My Properties</h2>
         <button onClick={openAddPropertyModal} className="flex items-center space-x-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl font-semibold text-sm shadow-md hover:bg-blue-700 transition-colors">
@@ -231,40 +360,46 @@ export default function LandlordHome() {
             const unitCount = p.units?.length || 0;
             const occupiedCount = p.units?.filter(u => u.status === 'occupied').length || 0;
             const percentage = unitCount > 0 ? (occupiedCount / unitCount) * 100 : 0;
+            const isExpanded = expandingId === p.id;
+            const currentSmsStatus = smsStatus[p.id] || 'idle';
             
             return (
-              <div key={p.id} className="group bg-white rounded-2xl overflow-hidden border border-gray-100 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1">
-                {p.image_url ? (
-                  <div className="relative h-44 overflow-hidden">
+              <div key={p.id} className={`group bg-white rounded-2xl overflow-hidden border transition-all duration-300 ${isExpanded ? 'border-teal-300 shadow-xl ring-1 ring-teal-200' : 'border-gray-100 hover:shadow-xl'} transform hover:-translate-y-1`}>
+                
+                <div className="relative h-44 overflow-hidden bg-gradient-to-br from-gray-100 to-gray-50">
+                  {p.image_url ? (
                     <img src={p.image_url} alt={p.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-                    <div className="absolute bottom-3 left-3">
-                       <h3 className="text-lg font-bold text-white drop-shadow-md">{p.title}</h3>
-                       <p className="text-xs text-gray-200">{p.location}</p>
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-gray-300">
+                      <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                     </div>
-                    <span className={`absolute top-3 right-3 text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wide ${p.status === 'active' ? 'bg-green-500 text-white' : 'bg-gray-600 text-white'}`}>
-                      {p.status}
-                    </span>
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+                  <div className="absolute bottom-3 left-3 right-3 flex justify-between items-end">
+                    <div>
+                      <h3 className="text-lg font-bold text-white drop-shadow-md">{p.title}</h3>
+                      <p className="text-xs text-gray-200">{p.location}</p>
+                    </div>
+                    <div className="flex flex-col items-end gap-1">
+                      {getVerificationBadge(p)}
+                      {p.sms_state === 'awaiting_vacancy' && (
+                        <span className="bg-purple-100 text-purple-700 px-2 py-0.5 text-[10px] rounded-full font-bold animate-pulse">📱 SMS Sent</span>
+                      )}
+                      {p.sms_state === 'awaiting_unit_count' && (
+                        <span className="bg-blue-100 text-blue-700 px-2 py-0.5 text-[10px] rounded-full font-bold animate-pulse">📱 Awaiting Count</span>
+                      )}
+                    </div>
                   </div>
-                ) : (
-                  <div className="relative h-44 bg-gradient-to-br from-gray-100 to-gray-50 flex items-center justify-center text-gray-400 group-hover:from-gray-50 group-hover:to-white transition-colors">
-                     <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                     <span className={`absolute top-3 right-3 text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wide ${p.status === 'active' ? 'bg-green-500 text-white' : 'bg-gray-600 text-white'}`}>
-                       {p.status}
-                     </span>
-                  </div>
-                )}
+                </div>
                 
                 <div className="p-4">
                   <div className="flex justify-between items-center mb-3">
                     <span className="text-xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">
                       KES {p.price?.toLocaleString()}
                     </span>
-                    {isPro && unitCount > 0 && (
-                       <span className="text-xs font-medium text-gray-500 bg-gray-50 px-2 py-1 rounded-md border border-gray-100">
-                         {unitCount} Units
-                       </span>
-                    )}
+                    <span className="text-xs font-semibold text-gray-500 bg-gray-50 px-2 py-1 rounded-md border border-gray-100">
+                      {p.available_units || 0}/{p.total_units || unitCount || 1} Units
+                    </span>
                   </div>
                   
                   {isPro && unitCount > 0 && (
@@ -279,18 +414,71 @@ export default function LandlordHome() {
                     </div>
                   )}
 
+                  {isExpanded && (
+                    <div className="bg-teal-50 p-3 rounded-xl border border-teal-200 mb-4 space-y-3 animate-fade-in">
+                      <p className="text-xs font-semibold text-teal-800">Update Availability & Verify</p>
+                      <div className="flex gap-3">
+                        <div className="flex-1">
+                          <label className="block text-[10px] font-medium text-gray-600 mb-1">Total Units</label>
+                          <input type="number" value={totalUnits} onChange={(e) => setTotalUnits(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-teal-500 focus:border-teal-500 outline-none" min="1" />
+                        </div>
+                        <div className="flex-1">
+                          <label className="block text-[10px] font-medium text-gray-600 mb-1">Available</label>
+                          <input type="number" value={availableUnits} onChange={(e) => setAvailableUnits(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-teal-500 focus:border-teal-500 outline-none" min="0" />
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={() => setExpandingId(null)} className="flex-1 border border-gray-300 text-gray-700 text-xs font-semibold py-2 rounded-lg hover:bg-white transition">Cancel</button>
+                        <button onClick={() => handleVerify(p.id)} disabled={verifyingId === p.id} className="flex-1 bg-teal-600 text-white text-xs font-semibold py-2 rounded-lg hover:bg-teal-700 transition disabled:opacity-50">
+                          {verifyingId === p.id ? 'Saving...' : '✔ Verify'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="flex items-center justify-between pt-3 border-t border-gray-50">
                      <div className="flex space-x-1">
-                       <button onClick={() => openEdit(p)} className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                       <button onClick={() => openEdit(p)} className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Edit">
                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                        </button>
-                       <button onClick={() => handleDelete(p)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                       <button onClick={() => handleDelete(p)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete">
                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                        </button>
+                       
+                       <button 
+                         onClick={() => handleTestSMS(p)} 
+                         disabled={currentSmsStatus === 'loading'}
+                         className={`p-2 rounded-lg transition-colors disabled:opacity-50 ${
+                           currentSmsStatus === 'success' ? 'text-green-600 bg-green-50' : 
+                           currentSmsStatus === 'error' ? 'text-red-600 bg-red-50' : 
+                           'text-purple-500 hover:text-purple-700 hover:bg-purple-50'
+                         }`} 
+                         title="Test AT SMS"
+                       >
+                         {currentSmsStatus === 'loading' ? (
+                           <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-purple-500"></div>
+                         ) : currentSmsStatus === 'success' ? (
+                           <span className="text-[10px] font-bold">✔ Sent</span>
+                         ) : currentSmsStatus === 'error' ? (
+                           <span className="text-[10px] font-bold">✖ Err</span>
+                         ) : (
+                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
+                         )}
+                       </button>
                      </div>
-                     <button onClick={() => toggleStatus(p)} className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-colors ${p.status === 'active' ? 'text-orange-500 bg-orange-50 hover:bg-orange-100' : 'text-green-600 bg-green-50 hover:bg-green-100'}`}>
-                       {p.status === 'active' ? 'Deactivate' : 'Activate'}
-                     </button>
+                     
+                     {isPro ? (
+                       <button 
+                         onClick={() => isExpanded ? setExpandingId(null) : handleOpenVerify(p)} 
+                         className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-colors ${isExpanded ? 'text-gray-500 bg-gray-100 hover:bg-gray-200' : 'text-white bg-teal-600 hover:bg-teal-700'}`}
+                       >
+                         {isExpanded ? 'Cancel' : '✔ Update Status'}
+                       </button>
+                     ) : (
+                       <button onClick={() => toggleStatus(p)} className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-colors ${p.status === 'active' ? 'text-orange-500 bg-orange-50 hover:bg-orange-100' : 'text-green-600 bg-green-50 hover:bg-green-100'}`}>
+                         {p.status === 'active' ? 'Deactivate' : 'Activate'}
+                       </button>
+                     )}
                   </div>
                 </div>
               </div>

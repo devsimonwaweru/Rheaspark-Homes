@@ -1,9 +1,13 @@
+// src/pages/FindHouses.jsx
+
 import React, { useState, useEffect } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { Link } from "react-router-dom";
 import { counties, constituencies } from "../data/locations";
 import PropertyCard from "../components/PropertyCard";
 import PropertyDetailsModal from "../components/PropertyDetailsModal";
+
+const FAVORITES_KEY = 'rheaspark_favorites';
 
 export default function FindHouses() {
   const [properties, setProperties] = useState([]);
@@ -13,6 +17,18 @@ export default function FindHouses() {
   
   // Auth State
   const [authStatus, setAuthStatus] = useState('checking');
+  const [session, setSession] = useState(null);
+
+  // Favorites State - Initialize from localStorage to prevent disappearing on refresh
+  const [favorites, setFavorites] = useState(() => {
+    try {
+      const stored = localStorage.getItem(FAVORITES_KEY);
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    // eslint-disable-next-line no-unused-vars
+    } catch (e) {
+      return new Set();
+    }
+  });
 
   const [filters, setFilters] = useState({
     searchQuery: "", minPrice: "", maxPrice: "", type: "All",
@@ -22,29 +38,59 @@ export default function FindHouses() {
   const [constituencyOptions, setConstituencyOptions] = useState([]);
 
   useEffect(() => {
-    fetchProperties();
-    checkAuth();
+    const initializeData = async () => {
+      await fetchProperties();
+      
+      // Check Auth & Sync Favorites
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      setSession(currentSession);
+      
+      if (currentSession) {
+        const { data: profile } = await supabase
+          .from('landlords')
+          .select('subscription_status')
+          .eq('id', currentSession.user.id)
+          .single();
+
+        if (profile?.subscription_status === 'active') setAuthStatus('pro');
+        else if (profile) setAuthStatus('user');
+        else setAuthStatus('guest');
+
+        // Fetch real favorites from DB for logged-in users
+        const { data: favData } = await supabase
+          .from('favorites')
+          .select('property_id')
+          .eq('user_id', currentSession.user.id);
+        
+        if (favData && favData.length > 0) {
+          const dbFavs = new Set(favData.map(f => f.property_id));
+          setFavorites(dbFavs);
+          localStorage.setItem(FAVORITES_KEY, JSON.stringify([...dbFavs]));
+        } else {
+          // If DB is empty, clear local storage to stay in sync
+          setFavorites(new Set());
+          localStorage.setItem(FAVORITES_KEY, JSON.stringify([]));
+        }
+      } else {
+        setAuthStatus('guest');
+      }
+    };
+
+    initializeData();
   }, []);
-
-  const checkAuth = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) { setAuthStatus('guest'); return; }
-    
-    const { data: profile } = await supabase
-      .from('landlords')
-      .select('subscription_status')
-      .eq('id', session.user.id)
-      .single();
-
-    if (profile?.subscription_status === 'active') setAuthStatus('pro');
-    else if (profile) setAuthStatus('user');
-    else setAuthStatus('guest');
-  };
 
   const fetchProperties = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.from("properties").select("*").eq("status", "active").order("created_at", { ascending: false });
+      await supabase.rpc('expire_overdue_verifications');
+
+      const { data, error } = await supabase
+        .from("properties")
+        .select("*")
+        .eq("status", "active")
+        .eq("auto_hidden", false)
+        .order('last_verified_at', { ascending: false });
+
       if (error) throw error;
       setProperties(data || []);
     } catch (error) {
@@ -65,6 +111,34 @@ export default function FindHouses() {
     }
   };
 
+  const handleToggleFavorite = async (propertyId) => {
+    const isCurrentlyFav = favorites.has(propertyId);
+    const newFavorites = new Set(favorites);
+    
+    if (isCurrentlyFav) {
+      newFavorites.delete(propertyId);
+    } else {
+      newFavorites.add(propertyId);
+    }
+
+    // 1. Optimistic UI Update
+    setFavorites(newFavorites);
+    localStorage.setItem(FAVORITES_KEY, JSON.stringify([...newFavorites]));
+
+    // 2. Database Sync for Logged-in Users
+    if (session) {
+      try {
+        if (isCurrentlyFav) {
+          await supabase.from('favorites').delete().match({ user_id: session.user.id, property_id: propertyId });
+        } else {
+          await supabase.from('favorites').insert({ user_id: session.user.id, property_id: propertyId });
+        }
+      } catch (error) {
+        console.error("Error syncing favorite to database:", error);
+      }
+    }
+  };
+
   const filteredProperties = properties.filter((p) => {
     if (filters.searchQuery) {
       const query = filters.searchQuery.toLowerCase();
@@ -81,6 +155,13 @@ export default function FindHouses() {
     return true;
   });
 
+  // Sort: favorites first, then maintain original order
+  const sortedProperties = [...filteredProperties].sort((a, b) => {
+    const aFav = favorites.has(a.id) ? 1 : 0;
+    const bFav = favorites.has(b.id) ? 1 : 0;
+    return bFav - aFav;
+  });
+
   const handleViewDetails = (property) => { setSelectedProperty(property); setIsModalOpen(true); };
 
   return (
@@ -91,14 +172,14 @@ export default function FindHouses() {
             Find Your{" "}
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-emerald-500">Perfect Home</span>
           </h1>
-          <p className="text-gray-500 text-lg">Browse verified listings.</p>
+          <p className="text-gray-500 text-lg">Browse verified, up-to-date listings.</p>
         </div>
 
         {/* Filter UI */}
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 mb-8 space-y-4">
           <div className="relative">
              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-               <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+               <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
              </div>
              <input type="text" name="searchQuery" value={filters.searchQuery} onChange={handleFilterChange} placeholder="Search by name or location" className="w-full pl-11 pr-4 py-3 border-2 border-gray-200 rounded-xl text-gray-800 focus:border-blue-500 outline-none transition-colors" />
           </div>
@@ -136,16 +217,29 @@ export default function FindHouses() {
         )}
 
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-bold text-gray-800"><span className="text-blue-600">{filteredProperties.length}</span> Properties Found</h2>
+          <h2 className="text-xl font-bold text-gray-800"><span className="text-blue-600">{sortedProperties.length}</span> Properties Found</h2>
+          {favorites.size > 0 && (
+            <span className="text-sm text-gray-500">
+              <span className="text-red-500 font-semibold">{favorites.size}</span> favorited
+            </span>
+          )}
         </div>
 
         {loading ? (
           <div className="text-center py-20 text-gray-400"><div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-600 mx-auto mb-4"></div>Loading properties...</div>
-        ) : filteredProperties.length === 0 ? (
+        ) : sortedProperties.length === 0 ? (
           <div className="text-center py-20 bg-white rounded-2xl border border-gray-100"><h3 className="text-lg font-semibold text-gray-700">No properties found</h3><p className="text-gray-400 text-sm">Try adjusting your search or filters.</p></div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8">
-            {filteredProperties.map((property) => (<PropertyCard key={property.id} property={property} onViewDetails={handleViewDetails} />))}
+            {sortedProperties.map((property) => (
+              <PropertyCard 
+                key={property.id} 
+                property={property} 
+                onViewDetails={handleViewDetails}
+                isFavorite={favorites.has(property.id)}
+                onToggleFavorite={handleToggleFavorite}
+              />
+            ))}
           </div>
         )}
 
