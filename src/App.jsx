@@ -1,4 +1,3 @@
-// src/App.jsx
 import React, { useEffect, useState } from "react";
 import { HashRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { supabase } from "./lib/supabaseClient";
@@ -39,6 +38,7 @@ import AdminUsers from "./pages/AdminUsers";
 import AdminLandlords from "./pages/AdminLandlords";
 import AdminProperties from "./pages/AdminProperties";
 import AdminMovers from "./pages/AdminMovers";
+import AdminSettings from "./pages/AdminSettings";
 
 // NEW: Import JoinPage
 import JoinPage from "./pages/JoinPage";
@@ -72,8 +72,6 @@ function App() {
   if (loading) return <div className="flex items-center justify-center min-h-screen text-gray-500">Loading...</div>;
 
   // --- PASSWORD RESET INTERCEPTOR ---
-  // Because we use HashRouter, we force Supabase to send tokens via standard query params (?token=)
-  // so HashRouter doesn't break them. We catch them here before React Router loads.
   if (typeof window !== "undefined") {
     const searchParams = new URLSearchParams(window.location.search);
     if (searchParams.has("access_token") && searchParams.get("type") === "recovery") {
@@ -81,12 +79,10 @@ function App() {
       sessionStorage.setItem("reset_access_token", searchParams.get("access_token"));
       sessionStorage.setItem("reset_refresh_token", searchParams.get("refresh_token"));
       
-      // Clean up URL and send to the HashRouter page
       window.location.replace("/#/update-password");
       return null; 
     }
   }
-  // ---------------------------------
 
   return (
     <Router>
@@ -106,6 +102,7 @@ function App() {
           <Route path="landlords" element={<AdminLandlords />} />
           <Route path="properties" element={<AdminProperties />} />
           <Route path="movers" element={<AdminMovers />} />
+          <Route path="settings" element={<AdminSettings />} />
         </Route>
 
         {/* USER */}

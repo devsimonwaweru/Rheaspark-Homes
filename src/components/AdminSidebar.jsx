@@ -1,4 +1,3 @@
-// src/components/AdminSidebar.jsx
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -23,6 +22,10 @@ const AdminSidebar = ({ closeSidebar }) => {
     { name: 'Landlords', path: '/admin/landlords', icon: 'fa-user-tie' },
     { name: 'Properties', path: '/admin/properties', icon: 'fa-home' },
     { name: 'Movers', path: '/admin/movers', icon: 'fa-truck' },
+  ];
+
+  const bottomNavItems = [
+    { name: 'Settings', path: '/admin/settings', icon: 'fa-cog' },
   ];
 
   return (
@@ -59,7 +62,28 @@ const AdminSidebar = ({ closeSidebar }) => {
 
       {/* Navigation Links */}
       <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+        <p className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Main</p>
         {navItems.map((item) => (
+          <NavLink
+            key={item.name}
+            to={item.path}
+            end={item.path === '/admin'}
+            onClick={() => closeSidebar && closeSidebar()}
+            className={({ isActive }) =>
+              `sidebar-link flex items-center p-3 rounded-lg hover:bg-gray-700 transition-all duration-300 ${
+                isActive ? 'active bg-gray-700 text-white' : 'text-gray-300 hover:text-white'
+              }`
+            }
+          >
+            <i className={`fas ${item.icon} w-6 mr-3`}></i>
+            <span>{item.name}</span>
+          </NavLink>
+        ))}
+      </nav>
+
+      {/* Bottom Navigation */}
+      <div className="p-4 border-t border-gray-700 space-y-2">
+        {bottomNavItems.map((item) => (
           <NavLink
             key={item.name}
             to={item.path}
@@ -74,13 +98,9 @@ const AdminSidebar = ({ closeSidebar }) => {
             <span>{item.name}</span>
           </NavLink>
         ))}
-      </nav>
-
-      {/* Logout Button */}
-      <div className="p-4 border-t border-gray-700">
         <button 
           onClick={handleLogout}
-          className="flex items-center p-3 rounded-lg hover:bg-gray-700 w-full text-left text-gray-300 hover:text-white transition-colors duration-300"
+          className="flex items-center p-3 rounded-lg hover:bg-red-900/30 w-full text-left text-gray-300 hover:text-red-400 transition-colors duration-300"
         >
           <i className="fas fa-sign-out-alt w-6 mr-3"></i>
           <span>Logout</span>
