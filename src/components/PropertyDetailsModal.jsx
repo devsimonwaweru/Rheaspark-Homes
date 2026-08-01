@@ -10,31 +10,33 @@ export default function PropertyDetailsModal({ isOpen, onClose, property, isFavo
   const [loading, setLoading] = useState(true);
   const [showPayment, setShowPayment] = useState(false);
   const [paymentType, setPaymentType] = useState("view_property");
-  
+
   // Image gallery state
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showOverlay, setShowOverlay] = useState(true);
   const [isZoomed, setIsZoomed] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(1);
   const [panPos, setPanPos] = useState({ x: 0, y: 0 });
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [imageLoaded, setImageLoaded] = useState(false);
-  const [slideDirection, setSlideDirection] = useState(null);
-  
-  // Touch handling refs
-  const lastTouchDist = useRef(null);
-  const lastTouchCenter = useRef(null);
-  const touchStartRef = useRef({ x: 0, y: 0 });
-  const touchStartTime = useRef(0);
-  const lastTapRef = useRef(0);
-  const imageRef = useRef(null);
+
+  // Unlock options modal
+  const [showUnlockOptions, setShowUnlockOptions] = useState(false);
+
+  // Fees from database
+  const [fees, setFees] = useState(null);
+  const [feesLoading, setFeesLoading] = useState(true);
+
+  // Refs
   const containerRef = useRef(null);
   const overlayTimeoutRef = useRef(null);
+  const stateRef = useRef({});
 
-  // Fees from settings
-  const [fees, setFees] = useState(null);
+  const getCloudinaryUrl = (url, width) => {
+    if (!url) return url;
+    return `https://res.cloudinary.com/deqowfv7y/image/fetch/f_auto,q_auto,w_${width}/${url}`;
+  };
 
+  // ===== IMAGE LIST (must be before stateRef sync) =====
   const imageList = useMemo(() => {
     if (!property) return [];
     let sources = [];
@@ -49,7 +51,6 @@ export default function PropertyDetailsModal({ isOpen, onClose, property, isFavo
           const matches = rawData.match(/https?:\/\/[^,}]+/g);
           if (matches) sources = matches;
         }
-      // eslint-disable-next-line no-unused-vars
       } catch (e) {
         if (typeof rawData === 'string') sources = rawData.split(',').map(s => s.trim());
       }
@@ -61,34 +62,39 @@ export default function PropertyDetailsModal({ isOpen, onClose, property, isFavo
     return sources.filter(Boolean);
   }, [property]);
 
-  // Fetch fees from settings
+  // ===== Sync stateRef AFTER all declarations =====
+  stateRef.current = { isZoomed, zoomLevel, panPos, currentIndex, imageList, showOverlay };
+
+  // ===== Fees logic =====
+  const fetchFees = useCallback(async () => {
+    setFeesLoading(true);
+    const { data, error } = await supabase
+      .from('viewing_fees')
+      .select('*');
+
+    if (data && data.length > 0) {
+      setFees(data);
+    } else {
+      setFees([
+        { property_type: 'Bedsitter/Studio', view_fee: 30, agent_fee: 200 },
+        { property_type: 'Single Room', view_fee: 20, agent_fee: 150 },
+        { property_type: '1 Bedroom', view_fee: 50, agent_fee: 300 },
+        { property_type: '2 Bedroom', view_fee: 80, agent_fee: 400 },
+        { property_type: '3 Bedroom', view_fee: 100, agent_fee: 500 },
+        { property_type: 'Apartment/Flat', view_fee: 100, agent_fee: 600 },
+        { property_type: 'Commercial', view_fee: 150, agent_fee: 800 },
+      ]);
+    }
+    setFeesLoading(false);
+  }, []);
+
   useEffect(() => {
-    const fetchFees = async () => {
-      const { data } = await supabase
-        .from('viewing_fees')
-        .select('*');
-      
-      if (data && data.length > 0) {
-        setFees(data);
-      } else {
-        setFees([
-          { property_type: 'Bedsitter/Studio', view_fee: 30, agent_fee: 200 },
-          { property_type: 'Single Room', view_fee: 20, agent_fee: 150 },
-          { property_type: '1 Bedroom', view_fee: 50, agent_fee: 300 },
-          { property_type: '2 Bedroom', view_fee: 80, agent_fee: 400 },
-          { property_type: '3 Bedroom', view_fee: 100, agent_fee: 500 },
-          { property_type: 'Apartment/Flat', view_fee: 100, agent_fee: 600 },
-          { property_type: 'Commercial', view_fee: 150, agent_fee: 800 },
-        ]);
-      }
-    };
-    
     if (isOpen) fetchFees();
-  }, [isOpen]);
+  }, [isOpen, fetchFees]);
 
   const getFeesForProperty = useCallback(() => {
     if (!fees || !property?.type) return { viewFee: 100, agentFee: 500 };
-    
+
     const type = property.type.toLowerCase();
     let matched = fees.find(f => {
       const ft = f.property_type.toLowerCase();
@@ -108,6 +114,13 @@ export default function PropertyDetailsModal({ isOpen, onClose, property, isFavo
 
   const { viewFee, agentFee } = getFeesForProperty();
 
+  // ===== Zoom reset =====
+  const resetZoom = useCallback(() => {
+    setIsZoomed(false);
+    setZoomLevel(1);
+    setPanPos({ x: 0, y: 0 });
+  }, []);
+
   useEffect(() => {
     if (isOpen) {
       setCurrentIndex(0);
@@ -115,175 +128,204 @@ export default function PropertyDetailsModal({ isOpen, onClose, property, isFavo
       setImageLoaded(false);
       resetZoom();
     }
-  }, [isOpen, imageList]);
+  }, [isOpen, imageList, resetZoom]);
 
-  // Reset zoom when image changes
   useEffect(() => {
     resetZoom();
     setImageLoaded(false);
-  }, [currentIndex]);
+  }, [currentIndex, resetZoom]);
+
+  // ===== NON-PASSIVE EVENT LISTENERS =====
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || !isOpen) return;
+
+    let lastTouchDist = null;
+    let touchStartPos = { x: 0, y: 0 };
+    let touchStartTime = 0;
+    let lastTapTime = 0;
+    let localIsDrag = false;
+    let dragStartLocal = { x: 0, y: 0 };
+
+    const onTouchStart = (e) => {
+      const { isZoomed, panPos } = stateRef.current;
+
+      if (e.touches.length === 2) {
+        e.preventDefault();
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        lastTouchDist = Math.sqrt(dx * dx + dy * dy);
+      } else if (e.touches.length === 1) {
+        touchStartPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        touchStartTime = Date.now();
+
+        if (isZoomed) {
+          localIsDrag = true;
+          dragStartLocal = { x: e.touches[0].clientX - panPos.x, y: e.touches[0].clientY - panPos.y };
+        }
+      }
+    };
+
+    const onTouchMove = (e) => {
+      const { isZoomed, zoomLevel } = stateRef.current;
+
+      if (e.touches.length === 2 && lastTouchDist) {
+        e.preventDefault();
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        const newDist = Math.sqrt(dx * dx + dy * dy);
+        const scale = newDist / lastTouchDist;
+        const newZoom = Math.min(Math.max(zoomLevel * scale, 1), 4);
+
+        if (newZoom > 1.1) { setIsZoomed(true); setShowOverlay(false); }
+        else if (newZoom < 1.05) setIsZoomed(false);
+
+        setZoomLevel(newZoom);
+        lastTouchDist = newDist;
+      } else if (e.touches.length === 1 && localIsDrag && isZoomed) {
+        e.preventDefault();
+        setPanPos({
+          x: e.touches[0].clientX - dragStartLocal.x,
+          y: e.touches[0].clientY - dragStartLocal.y
+        });
+      }
+    };
+
+    const onTouchEnd = (e) => {
+      const { isZoomed, imageList, currentIndex } = stateRef.current;
+
+      if (e.touches.length === 0 && !isZoomed && lastTouchDist === null) {
+        const touch = e.changedTouches[0];
+        const deltaX = touch.clientX - touchStartPos.x;
+        const deltaTime = Date.now() - touchStartTime;
+
+        if (Math.abs(deltaX) > 50 && deltaTime < 400) {
+          if (deltaX > 0) {
+            setCurrentIndex((currentIndex - 1 + imageList.length) % imageList.length);
+          } else {
+            setCurrentIndex((currentIndex + 1) % imageList.length);
+          }
+        }
+      }
+
+      lastTouchDist = null;
+      setTimeout(() => { localIsDrag = false; }, 80);
+    };
+
+    const onClick = (e) => {
+      if (localIsDrag) return;
+      if (e.target.closest('button') || e.target.closest('a')) return;
+
+      const now = Date.now();
+      const { isZoomed, showOverlay: currentOverlay } = stateRef.current;
+
+      if (now - lastTapTime < 300) {
+        if (isZoomed) {
+          setIsZoomed(false);
+          setZoomLevel(1);
+          setPanPos({ x: 0, y: 0 });
+        } else {
+          setIsZoomed(true);
+          setZoomLevel(2.5);
+          setShowOverlay(false);
+        }
+        lastTapTime = 0;
+      } else {
+        lastTapTime = now;
+        const newVal = !currentOverlay;
+        setShowOverlay(newVal);
+        if (!newVal) {
+          if (overlayTimeoutRef.current) clearTimeout(overlayTimeoutRef.current);
+          overlayTimeoutRef.current = setTimeout(() => {
+            if (!stateRef.current.isZoomed) setShowOverlay(false);
+          }, 5000);
+        }
+      }
+    };
+
+    const onWheel = (e) => {
+      e.preventDefault();
+      const { zoomLevel } = stateRef.current;
+      const delta = e.deltaY > 0 ? -0.2 : 0.2;
+      const newZoom = Math.min(Math.max(zoomLevel + delta, 1), 4);
+
+      if (newZoom > 1.1) { setIsZoomed(true); setShowOverlay(false); }
+      else if (newZoom <= 1) {
+        setIsZoomed(false);
+        setZoomLevel(1);
+        setPanPos({ x: 0, y: 0 });
+        return;
+      }
+
+      setZoomLevel(newZoom);
+    };
+
+    el.addEventListener('touchstart', onTouchStart, { passive: false });
+    el.addEventListener('touchmove', onTouchMove, { passive: false });
+    el.addEventListener('touchend', onTouchEnd, { passive: false });
+    el.addEventListener('wheel', onWheel, { passive: false });
+    el.addEventListener('click', onClick);
+
+    return () => {
+      el.removeEventListener('touchstart', onTouchStart);
+      el.removeEventListener('touchmove', onTouchMove);
+      el.removeEventListener('touchend', onTouchEnd);
+      el.removeEventListener('wheel', onWheel);
+      el.removeEventListener('click', onClick);
+    };
+  }, [isOpen]);
+
+  // Overlay auto-hide
+  useEffect(() => {
+    if (showOverlay && isOpen) {
+      if (overlayTimeoutRef.current) clearTimeout(overlayTimeoutRef.current);
+      overlayTimeoutRef.current = setTimeout(() => {
+        if (!stateRef.current.isZoomed) setShowOverlay(false);
+      }, 5000);
+    }
+    return () => {
+      if (overlayTimeoutRef.current) clearTimeout(overlayTimeoutRef.current);
+    };
+  }, [showOverlay, isOpen]);
 
   // Keyboard navigation
   useEffect(() => {
     if (!isOpen) return;
-    
+
     const handleKeyDown = (e) => {
-      if (e.key === 'ArrowLeft') goToPrev();
-      else if (e.key === 'ArrowRight') goToNext();
-      else if (e.key === 'Escape') {
-        if (isZoomed) resetZoom();
+      if (showUnlockOptions) {
+        if (e.key === 'Escape') { setShowUnlockOptions(false); e.preventDefault(); }
+        return;
+      }
+      if (e.key === 'ArrowLeft') {
+        const { isZoomed: z, currentIndex: i, imageList: l } = stateRef.current;
+        if (z) { resetZoom(); return; }
+        if (l.length > 1) setCurrentIndex((i - 1 + l.length) % l.length);
+      } else if (e.key === 'ArrowRight') {
+        const { isZoomed: z, currentIndex: i, imageList: l } = stateRef.current;
+        if (z) { resetZoom(); return; }
+        if (l.length > 1) setCurrentIndex((i + 1) % l.length);
+      } else if (e.key === 'Escape') {
+        if (stateRef.current.isZoomed) resetZoom();
         else onClose();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, isZoomed, currentIndex, imageList.length]);
+  }, [isOpen, showUnlockOptions, onClose, resetZoom]);
 
-  // Auto-hide overlay
-  const startOverlayTimeout = () => {
-    if (overlayTimeoutRef.current) clearTimeout(overlayTimeoutRef.current);
-    overlayTimeoutRef.current = setTimeout(() => {
-      if (!isZoomed) setShowOverlay(false);
-    }, 5000);
+  // Nav button handlers
+  const goToPrev = () => {
+    const { isZoomed: z, currentIndex: i, imageList: l } = stateRef.current;
+    if (z) { resetZoom(); return; }
+    if (l.length > 1) setCurrentIndex((i - 1 + l.length) % l.length);
   };
 
-  useEffect(() => {
-    if (showOverlay && isOpen) startOverlayTimeout();
-    return () => {
-      if (overlayTimeoutRef.current) clearTimeout(overlayTimeoutRef.current);
-    };
-  }, [showOverlay, isOpen]);
-
-  const resetZoom = () => {
-    setIsZoomed(false);
-    setZoomLevel(1);
-    setPanPos({ x: 0, y: 0 });
-  };
-
-  const goToNext = useCallback(() => {
-    if (isZoomed) { resetZoom(); return; }
-    if (imageList.length <= 1) return;
-    setSlideDirection('right');
-    setTimeout(() => {
-      setCurrentIndex(prev => (prev + 1) % imageList.length);
-      setSlideDirection(null);
-    }, 150);
-  }, [isZoomed, imageList.length]);
-
-  const goToPrev = useCallback(() => {
-    if (isZoomed) { resetZoom(); return; }
-    if (imageList.length <= 1) return;
-    setSlideDirection('left');
-    setTimeout(() => {
-      setCurrentIndex(prev => (prev - 1 + imageList.length) % imageList.length);
-      setSlideDirection(null);
-    }, 150);
-  }, [isZoomed, imageList.length]);
-
-  const handleImageTap = (e) => {
-    if (isDragging) return;
-    
-    const now = Date.now();
-    if (now - lastTapRef.current < 300) {
-      // Double tap
-      if (isZoomed) {
-        resetZoom();
-      } else {
-        setIsZoomed(true);
-        setZoomLevel(2.5);
-        setShowOverlay(false);
-      }
-      e.preventDefault();
-    } else {
-      // Single tap - toggle overlay
-      setShowOverlay(!showOverlay);
-      if (!showOverlay) startOverlayTimeout();
-    }
-    lastTapRef.current = now;
-  };
-
-  // Touch handlers
-  const getTouchDistance = (touches) => {
-    const dx = touches[0].clientX - touches[1].clientX;
-    const dy = touches[0].clientY - touches[1].clientY;
-    return Math.sqrt(dx * dx + dy * dy);
-  };
-
-  const handleTouchStart = (e) => {
-    if (e.touches.length === 2) {
-      e.preventDefault();
-      lastTouchDist.current = getTouchDistance(e.touches);
-    } else if (e.touches.length === 1) {
-      touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-      touchStartTime.current = Date.now();
-      
-      if (isZoomed) {
-        setIsDragging(true);
-        setDragStart({ x: e.touches[0].clientX - panPos.x, y: e.touches[0].clientY - panPos.y });
-      }
-    }
-  };
-
-  const handleTouchMove = (e) => {
-    if (e.touches.length === 2 && lastTouchDist.current) {
-      e.preventDefault();
-      const newDist = getTouchDistance(e.touches);
-      const scale = newDist / lastTouchDist.current;
-      const newZoom = Math.min(Math.max(zoomLevel * scale, 1), 4);
-      
-      if (newZoom > 1.1) {
-        setIsZoomed(true);
-        setShowOverlay(false);
-      } else if (newZoom < 1.05) {
-        setIsZoomed(false);
-      }
-      
-      setZoomLevel(newZoom);
-      lastTouchDist.current = newDist;
-    } else if (e.touches.length === 1 && isDragging && isZoomed) {
-      e.preventDefault();
-      const newX = e.touches[0].clientX - dragStart.x;
-      const newY = e.touches[0].clientY - dragStart.y;
-      setPanPos({ x: newX, y: newY });
-      setIsDragging(true);
-    }
-  };
-
-  const handleTouchEnd = (e) => {
-    if (e.touches.length === 0 && !isZoomed && lastTouchDist.current === null) {
-      const touch = e.changedTouches[0];
-      const deltaX = touch.clientX - touchStartRef.current.x;
-      const deltaTime = Date.now() - touchStartTime.current;
-      
-      if (Math.abs(deltaX) > 50 && deltaTime < 400) {
-        if (deltaX > 0) goToPrev();
-        else goToNext();
-      }
-    }
-    
-    lastTouchDist.current = null;
-    lastTouchCenter.current = null;
-    
-    // Small delay to prevent tap firing after drag
-    setTimeout(() => setIsDragging(false), 50);
-  };
-
-  // Mouse wheel zoom (desktop)
-  const handleWheel = (e) => {
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? -0.2 : 0.2;
-    const newZoom = Math.min(Math.max(zoomLevel + delta, 1), 4);
-    
-    if (newZoom > 1.1) {
-      setIsZoomed(true);
-      setShowOverlay(false);
-    } else if (newZoom <= 1) {
-      resetZoom();
-      return;
-    }
-    
-    setZoomLevel(newZoom);
+  const goToNext = () => {
+    const { isZoomed: z, currentIndex: i, imageList: l } = stateRef.current;
+    if (z) { resetZoom(); return; }
+    if (l.length > 1) setCurrentIndex((i + 1) % l.length);
   };
 
   // Check access
@@ -291,25 +333,47 @@ export default function PropertyDetailsModal({ isOpen, onClose, property, isFavo
     const checkAccess = async () => {
       if (!property) return;
       setLoading(true);
-      const { data: { user } } = await supabase.auth.getUser();
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
 
-      if (user) {
-        const { data } = await supabase
-          .from("unlocks")
-          .select("id, unlock_type")
-          .eq("user_id", user.id)
-          .eq("property_id", property.id);
-        
-        if (data) {
-          if (data.some(d => d.unlock_type === 'view_property' || !d.unlock_type)) setHasAccess(true);
-          if (data.some(d => d.unlock_type === 'agent_escort' || d.unlock_type === 'both')) setHasAgentAccess(true);
+        if (user) {
+          let data = null;
+          let columnExists = true;
+
+          try {
+            const result = await supabase
+              .from("unlocks")
+              .select("id, unlock_type")
+              .eq("user_id", user.id)
+              .eq("property_id", property.id);
+            data = result.data;
+          } catch (err) {
+            columnExists = false;
+          }
+
+          if (columnExists && data) {
+            if (data.some(d => d.unlock_type === 'view_property' || !d.unlock_type || d.unlock_type === 'both')) setHasAccess(true);
+            if (data.some(d => d.unlock_type === 'agent_escort' || d.unlock_type === 'both')) setHasAgentAccess(true);
+          } else if (!columnExists) {
+            const { data: fallbackData } = await supabase
+              .from("unlocks")
+              .select("id")
+              .eq("user_id", user.id)
+              .eq("property_id", property.id);
+            if (fallbackData && fallbackData.length > 0) {
+              setHasAccess(true);
+              setHasAgentAccess(true);
+            }
+          }
         }
-      }
-      
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
-      if (currentUser?.id === property.landlord_id) {
-        setHasAccess(true);
-        setHasAgentAccess(true);
+
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        if (currentUser?.id === property.landlord_id) {
+          setHasAccess(true);
+          setHasAgentAccess(true);
+        }
+      } catch (err) {
+        console.error("Access check error:", err);
       }
       setLoading(false);
     };
@@ -324,12 +388,13 @@ export default function PropertyDetailsModal({ isOpen, onClose, property, isFavo
   if (!isOpen || !property) return null;
 
   const hasCoordinates = property.latitude && property.longitude;
-  const mapsUrl = hasCoordinates 
-    ? `https://www.google.com/maps/dir/?api=1&destination=${property.latitude},${property.longitude}` 
+  const mapsUrl = hasCoordinates
+    ? `https://www.google.com/maps/dir/?api=1&destination=${property.latitude},${property.longitude}`
     : '#';
 
-  const handleUnlock = (type) => {
+  const handleSelectPlan = (type) => {
     setPaymentType(type);
+    setShowUnlockOptions(false);
     setShowPayment(true);
   };
 
@@ -357,36 +422,23 @@ export default function PropertyDetailsModal({ isOpen, onClose, property, isFavo
     <>
       <div className="fixed inset-0 bg-black z-[100] flex flex-col animate-fadeIn">
         {/* Image Container */}
-        <div 
-          ref={containerRef}
-          className="flex-1 relative overflow-hidden bg-black min-h-0"
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
-          onWheel={handleWheel}
-          style={{ touchAction: 'none' }}
-        >
-          {/* Current Image */}
-          <div 
-            className="w-full h-full cursor-pointer select-none"
-            onClick={handleImageTap}
-          >
+        <div ref={containerRef} className="flex-1 relative overflow-hidden bg-black min-h-0" style={{ touchAction: 'none' }}>
+          <div className="w-full h-full">
             {imageList.length > 0 ? (
               <>
                 <img
-                  ref={imageRef}
-                  src={imageList[currentIndex]}
+                  src={getCloudinaryUrl(imageList[currentIndex], 800)}
                   alt={`${property.title} - ${currentIndex + 1}`}
-                  className="w-full h-full object-contain"
+                  className="w-full h-full object-contain pointer-events-none select-none"
                   style={{
                     transform: `scale(${zoomLevel}) translate(${panPos.x / zoomLevel}px, ${panPos.y / zoomLevel}px)`,
-                    transition: isDragging ? 'none' : 'transform 0.2s ease-out',
+                    transition: 'transform 0.2s ease-out',
                     opacity: imageLoaded ? 1 : 0
                   }}
                   draggable={false}
+                  loading="lazy"
                   onLoad={() => setImageLoaded(true)}
                 />
-                {/* Loading spinner */}
                 {!imageLoaded && (
                   <div className="absolute inset-0 flex items-center justify-center">
                     <div className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
@@ -403,25 +455,23 @@ export default function PropertyDetailsModal({ isOpen, onClose, property, isFavo
             )}
           </div>
 
-          {/* TOP OVERLAY - Property Info */}
-          <div 
-            className={`absolute top-0 left-0 right-0 z-10 transition-all duration-300 ease-in-out ${
-              showOverlay ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-full pointer-events-none'
+          {/* TOP OVERLAY */}
+          <div
+            className={`absolute top-0 left-0 right-0 z-10 transition-all duration-300 ease-in-out pointer-events-none ${
+              showOverlay ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-full'
             }`}
           >
-            {/* Gradient background for readability */}
             <div className="bg-gradient-to-b from-black/70 via-black/40 to-transparent pt-3 pb-12 px-3">
-              {/* Top bar with close and badges */}
-              <div className="flex justify-between items-start mb-3">
-                <button 
-                  onClick={(e) => { e.stopPropagation(); onClose(); }} 
+              <div className="flex justify-between items-start mb-3 pointer-events-auto">
+                <button
+                  onClick={(e) => { e.stopPropagation(); onClose(); }}
                   className="bg-white/15 backdrop-blur-md p-2.5 rounded-full hover:bg-white/25 active:bg-white/30 transition-colors"
                 >
                   <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
-                
+
                 <div className="flex gap-1.5">
                   {property.type && (
                     <span className="bg-white/15 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-medium text-white">
@@ -436,7 +486,6 @@ export default function PropertyDetailsModal({ isOpen, onClose, property, isFavo
                 </div>
               </div>
 
-              {/* Property Info Card */}
               <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-4 border border-white/15 shadow-xl">
                 <div className="flex justify-between items-start gap-3">
                   <div className="flex-1 min-w-0">
@@ -455,7 +504,6 @@ export default function PropertyDetailsModal({ isOpen, onClose, property, isFavo
                   </div>
                 </div>
 
-                {/* Quick Stats Row */}
                 <div className="flex flex-wrap gap-x-4 gap-y-1 mt-3 pt-3 border-t border-white/10">
                   <div className="flex items-center gap-1.5 text-white/80 text-xs">
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -498,7 +546,7 @@ export default function PropertyDetailsModal({ isOpen, onClose, property, isFavo
             </div>
           </div>
 
-          {/* Navigation Arrows - Hidden when zoomed */}
+          {/* Nav Arrows */}
           {imageList.length > 1 && !isZoomed && (
             <>
               <button
@@ -522,7 +570,7 @@ export default function PropertyDetailsModal({ isOpen, onClose, property, isFavo
 
           {/* Dot Indicators */}
           {imageList.length > 1 && showOverlay && !isZoomed && (
-            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20">
+            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 pointer-events-auto">
               <div className="flex gap-1.5 bg-black/30 backdrop-blur-md p-1.5 rounded-full">
                 {imageList.map((_, index) => (
                   <button
@@ -537,18 +585,16 @@ export default function PropertyDetailsModal({ isOpen, onClose, property, isFavo
             </div>
           )}
 
-          {/* Tap to show info hint */}
           {!showOverlay && !isZoomed && (
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 animate-pulse">
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 animate-pulse pointer-events-none">
               <span className="text-white/40 text-xs bg-black/20 px-3 py-1.5 rounded-full backdrop-blur-sm">
                 Tap to show info
               </span>
             </div>
           )}
 
-          {/* Zoom indicator */}
           {isZoomed && (
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20">
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 pointer-events-auto">
               <button
                 onClick={(e) => { e.stopPropagation(); resetZoom(); }}
                 className="bg-black/50 backdrop-blur-md px-4 py-2 rounded-full text-white text-xs font-medium flex items-center gap-2 hover:bg-black/70 transition-colors"
@@ -562,7 +608,7 @@ export default function PropertyDetailsModal({ isOpen, onClose, property, isFavo
           )}
         </div>
 
-        {/* BOTTOM SECTION - Unlock Options & Actions */}
+        {/* BOTTOM SECTION */}
         <div className="bg-white border-t border-gray-100 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] max-h-[42vh] overflow-y-auto flex-shrink-0">
           {loading ? (
             <div className="p-6 space-y-4">
@@ -572,7 +618,6 @@ export default function PropertyDetailsModal({ isOpen, onClose, property, isFavo
             </div>
           ) : hasAccess ? (
             <div className="p-4 space-y-3">
-              {/* Contact Card */}
               <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-2xl p-4">
                 <div className="flex items-center justify-between">
                   <div>
@@ -581,7 +626,7 @@ export default function PropertyDetailsModal({ isOpen, onClose, property, isFavo
                       {property.landlord_phone}
                     </a>
                   </div>
-                  <a 
+                  <a
                     href={`tel:${property.landlord_phone}`}
                     className="bg-emerald-600 hover:bg-emerald-700 text-white p-3.5 rounded-xl transition-colors shadow-sm shadow-emerald-200"
                   >
@@ -592,10 +637,10 @@ export default function PropertyDetailsModal({ isOpen, onClose, property, isFavo
                 </div>
 
                 {hasCoordinates && (
-                  <a 
-                    href={mapsUrl} 
-                    target="_blank" 
-                    rel="noopener noreferrer" 
+                  <a
+                    href={mapsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="mt-3 w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition-colors text-sm shadow-sm"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -606,13 +651,12 @@ export default function PropertyDetailsModal({ isOpen, onClose, property, isFavo
                 )}
               </div>
 
-              {/* Action Buttons Row */}
               <div className="flex gap-2.5">
                 <button
                   onClick={onToggleFavorite}
                   className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm transition-all ${
-                    isFavorited 
-                      ? 'bg-pink-50 text-pink-600 border-2 border-pink-200 shadow-sm' 
+                    isFavorited
+                      ? 'bg-pink-50 text-pink-600 border-2 border-pink-200 shadow-sm'
                       : 'bg-gray-50 text-gray-600 border-2 border-gray-200 hover:border-pink-300 hover:text-pink-600'
                   }`}
                 >
@@ -622,7 +666,7 @@ export default function PropertyDetailsModal({ isOpen, onClose, property, isFavo
                   {isFavorited ? 'Saved' : 'Save'}
                 </button>
 
-                <a 
+                <a
                   href={`https://wa.me/${property.landlord_phone}?text=Hi, I'm interested in your property: ${property.title}`}
                   target="_blank"
                   rel="noopener noreferrer"
@@ -635,10 +679,9 @@ export default function PropertyDetailsModal({ isOpen, onClose, property, isFavo
                 </a>
               </div>
 
-              {/* Agent Escort Option */}
               {!hasAgentAccess && (
                 <button
-                  onClick={() => handleUnlock('agent_escort')}
+                  onClick={() => { setPaymentType('agent_escort'); setShowPayment(true); }}
                   className="w-full flex items-center justify-between bg-gradient-to-r from-purple-50 to-fuchsia-50 hover:from-purple-100 hover:to-fuchsia-100 border-2 border-purple-200 p-3.5 rounded-xl transition-colors"
                 >
                   <div className="flex items-center gap-3">
@@ -668,14 +711,11 @@ export default function PropertyDetailsModal({ isOpen, onClose, property, isFavo
               )}
             </div>
           ) : (
-            /* NOT UNLOCKED - Show unlock options */
             <div className="p-4 space-y-3">
-              {/* Brief description */}
               {property.description && (
                 <p className="text-gray-500 text-sm line-clamp-2 leading-relaxed">{property.description}</p>
               )}
-              
-              {/* Hidden contact preview */}
+
               <div className="relative bg-gray-50 rounded-xl overflow-hidden">
                 <div className="p-4 blur-[4px] select-none">
                   <p className="font-mono text-gray-400 text-lg">+254 7XX XXX XXX</p>
@@ -691,86 +731,177 @@ export default function PropertyDetailsModal({ isOpen, onClose, property, isFavo
                 </div>
               </div>
 
-              {/* Unlock Options */}
-              <div className="space-y-2">
-                {/* View Details Only */}
-                <button
-                  onClick={() => handleUnlock('view_property')}
-                  className="w-full flex items-center justify-between bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white p-4 rounded-xl transition-all shadow-sm shadow-blue-200 active:scale-[0.98]"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-11 h-11 bg-white/15 rounded-xl flex items-center justify-center">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                      </svg>
-                    </div>
-                    <div className="text-left">
-                      <p className="font-bold text-sm">View Details</p>
-                      <p className="text-[11px] text-blue-200">Phone number & exact location</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className="font-bold text-lg">KES {viewFee}</span>
-                  </div>
-                </button>
+              <button
+                onClick={() => setShowUnlockOptions(true)}
+                disabled={feesLoading}
+                className="w-full flex items-center justify-center gap-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white py-4 rounded-xl transition-all shadow-lg shadow-blue-200 active:scale-[0.98] font-bold text-base disabled:opacity-60"
+              >
+                {feesLoading ? (
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <>
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                    Unlock Property Details
+                  </>
+                )}
+              </button>
 
-                {/* Agent Escort Only */}
-                <button
-                  onClick={() => handleUnlock('agent_escort')}
-                  className="w-full flex items-center justify-between bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white p-4 rounded-xl transition-all shadow-sm shadow-purple-200 active:scale-[0.98]"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-11 h-11 bg-white/15 rounded-xl flex items-center justify-center">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                      </svg>
-                    </div>
-                    <div className="text-left">
-                      <p className="font-bold text-sm">Agent Escort</p>
-                      <p className="text-[11px] text-purple-200">Agent takes you to the property</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className="font-bold text-lg">KES {agentFee}</span>
-                  </div>
-                </button>
-
-                {/* Both Options - Best Value */}
-                <button
-                  onClick={() => handleUnlock('both')}
-                  className="w-full flex items-center justify-between bg-gradient-to-r from-blue-600 via-violet-600 to-purple-600 hover:from-blue-700 hover:via-violet-700 hover:to-purple-700 text-white p-4 rounded-xl transition-all shadow-sm shadow-violet-200 active:scale-[0.98] relative overflow-hidden"
-                >
-                  <div className="absolute top-0 right-0 bg-yellow-400 text-yellow-900 text-[10px] font-bold px-2.5 py-1 rounded-bl-lg">
-                    BEST VALUE
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="w-11 h-11 bg-white/15 rounded-xl flex items-center justify-center">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                      </svg>
-                    </div>
-                    <div className="text-left">
-                      <p className="font-bold text-sm">Full Access</p>
-                      <p className="text-[11px] text-violet-200">View details + Agent escort</p>
-                    </div>
-                  </div>
-                  <div className="text-right pr-16">
-                    <span className="font-bold text-lg">KES {(viewFee + agentFee).toLocaleString()}</span>
-                  </div>
-                </button>
-              </div>
+              <p className="text-center text-xs text-gray-400">Choose a plan that suits you</p>
             </div>
           )}
         </div>
+
+        {/* UNLOCK OPTIONS MODAL */}
+        {showUnlockOptions && (
+          <div className="absolute inset-0 z-50 flex items-end sm:items-center justify-center">
+            <div
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+              onClick={() => setShowUnlockOptions(false)}
+            />
+
+            <div className="relative w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl animate-slideUp z-10 max-h-[85vh] overflow-y-auto">
+              <div className="flex justify-center pt-3 pb-1 sm:hidden">
+                <div className="w-10 h-1 bg-gray-300 rounded-full" />
+              </div>
+
+              <div className="p-5 sm:p-6">
+                <div className="flex items-center justify-between mb-5">
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-900">Unlock Property</h3>
+                    <p className="text-sm text-gray-500 mt-0.5">Select a plan that works for you</p>
+                  </div>
+                  <button
+                    onClick={() => setShowUnlockOptions(false)}
+                    className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                  >
+                    <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-3 bg-gray-50 rounded-xl p-3 mb-5">
+                  {imageList[0] && (
+                    <img src={getCloudinaryUrl(imageList[0], 100)} alt="" className="w-14 h-14 rounded-lg object-cover flex-shrink-0" loading="lazy" />
+                  )}
+                  <div className="min-w-0">
+                    <p className="font-semibold text-gray-800 text-sm truncate">{property.title}</p>
+                    <p className="text-xs text-gray-500 truncate">{property.location}</p>
+                    <p className="text-sm font-bold text-blue-600 mt-0.5">KES {property.price?.toLocaleString()}/mo</p>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <button
+                    onClick={() => handleSelectPlan('view_property')}
+                    className="w-full text-left bg-white border-2 border-gray-200 hover:border-blue-400 rounded-2xl p-4 transition-all group active:scale-[0.98]"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-start gap-3">
+                        <div className="w-11 h-11 bg-blue-50 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:bg-blue-100 transition-colors">
+                          <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
+                        </div>
+                        <div>
+                          <p className="font-bold text-gray-900 text-sm">View Details</p>
+                          <p className="text-xs text-gray-500 mt-0.5">Get phone number & exact location</p>
+                          <div className="flex flex-wrap gap-1.5 mt-2">
+                            <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">Phone Number</span>
+                            <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">GPS Location</span>
+                            <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">Directions</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right flex-shrink-0 ml-3">
+                        <p className="text-lg font-bold text-gray-900">KES {viewFee}</p>
+                      </div>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => handleSelectPlan('agent_escort')}
+                    className="w-full text-left bg-white border-2 border-gray-200 hover:border-purple-400 rounded-2xl p-4 transition-all group active:scale-[0.98]"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-start gap-3">
+                        <div className="w-11 h-11 bg-purple-50 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:bg-purple-100 transition-colors">
+                          <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                          </svg>
+                        </div>
+                        <div>
+                          <p className="font-bold text-gray-900 text-sm">Agent Escort</p>
+                          <p className="text-xs text-gray-500 mt-0.5">An agent takes you to the property</p>
+                          <div className="flex flex-wrap gap-1.5 mt-2">
+                            <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">Physical Visit</span>
+                            <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">Agent Guided</span>
+                            <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">No Hassle</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right flex-shrink-0 ml-3">
+                        <p className="text-lg font-bold text-gray-900">KES {agentFee}</p>
+                      </div>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => handleSelectPlan('both')}
+                    className="w-full text-left bg-gradient-to-br from-blue-600 via-violet-600 to-purple-600 hover:from-blue-700 hover:via-violet-700 hover:to-purple-700 rounded-2xl p-4 transition-all group active:scale-[0.98] relative overflow-hidden"
+                  >
+                    <div className="absolute -top-8 -right-8 w-24 h-24 bg-white/10 rounded-full blur-xl" />
+                    <div className="absolute -bottom-4 -left-4 w-16 h-16 bg-white/5 rounded-full blur-lg" />
+
+                    <div className="relative flex items-start justify-between">
+                      <div className="flex items-start gap-3">
+                        <div className="w-11 h-11 bg-white/15 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:bg-white/20 transition-colors">
+                          <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                          </svg>
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <p className="font-bold text-white text-sm">Full Access</p>
+                            <span className="bg-yellow-400 text-yellow-900 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">Best Value</span>
+                          </div>
+                          <p className="text-xs text-white/70 mt-0.5">Everything included</p>
+                          <div className="flex flex-wrap gap-1.5 mt-2">
+                            <span className="text-[10px] bg-white/15 text-white/90 px-2 py-0.5 rounded-full">Phone</span>
+                            <span className="text-[10px] bg-white/15 text-white/90 px-2 py-0.5 rounded-full">GPS</span>
+                            <span className="text-[10px] bg-white/15 text-white/90 px-2 py-0.5 rounded-full">Agent</span>
+                            <span className="text-[10px] bg-white/15 text-white/90 px-2 py-0.5 rounded-full">Visit</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right flex-shrink-0 ml-3">
+                        <p className="text-lg font-bold text-white">KES {(viewFee + agentFee).toLocaleString()}</p>
+                      </div>
+                    </div>
+                  </button>
+                </div>
+
+                <div className="mt-5 flex items-start gap-2 text-xs text-gray-400">
+                  <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                  </svg>
+                  <span>Secure payment. Instant access after payment.</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
-      <PaymentModal 
+      <PaymentModal
         isOpen={showPayment}
         onClose={handlePaymentSuccess}
-        amount={getPaymentAmount()} 
-        type={paymentType} 
-        propertyId={property.id} 
+        amount={getPaymentAmount()}
+        type={paymentType}
+        propertyId={property.id}
       />
     </>
   );

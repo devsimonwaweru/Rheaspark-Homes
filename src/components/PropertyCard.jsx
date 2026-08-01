@@ -6,6 +6,11 @@ export default function PropertyCard({ property, onViewDetails, isFavorite, onTo
   const [currentIndex, setCurrentIndex] = useState(0);
   const [imgError, setImgError] = useState(false);
 
+  const getCloudinaryUrl = (url, width) => {
+    if (!url) return url;
+    return `https://res.cloudinary.com/deqowfv7y/image/fetch/f_auto,q_auto,w_${width}/${url}`;
+  };
+
   const imageList = useMemo(() => {
     let sources = [];
     const rawData = property.images;
@@ -81,9 +86,10 @@ export default function PropertyCard({ property, onViewDetails, isFavorite, onTo
         {hasImage ? (
           <>
             <img
-              src={imageList[currentIndex]}
+              src={getCloudinaryUrl(imageList[currentIndex], 400)}
               alt={`${property.title} - ${currentIndex + 1}`}
               onError={() => setImgError(true)}
+              loading="lazy"
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
             />
             
