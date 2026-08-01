@@ -66,19 +66,6 @@ export default function PropertyCard({ property, onViewDetails, isFavorite, onTo
     onToggleFavorite(property.id);
   };
 
-  const amenitiesList = useMemo(() => {
-    let data = property.amenities;
-    if (!data) return [];
-    if (Array.isArray(data)) return data.filter((item) => item?.trim() !== "");
-    if (typeof data === "string") {
-      let clean = data.startsWith("{") && data.endsWith("}") ? data.slice(1, -1) : data;
-      return clean.split(",").map((item) => item.trim()).filter(Boolean);
-    }
-    return [];
-  }, [property.amenities]);
-
-  const visibleAmenities = amenitiesList.slice(0, 3);
-
   return (
     <div className="bg-white rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100 flex flex-col group">
       {/* Image Area */}
@@ -155,25 +142,14 @@ export default function PropertyCard({ property, onViewDetails, isFavorite, onTo
         )}
       </div>
 
-      {/* Content */}
+      {/* Content - Cleaned Up */}
       <div className="p-5 flex flex-col flex-grow">
-        <div className="flex justify-between items-start mb-2">
-          <h3 className="text-lg font-bold text-gray-800 truncate flex-1 pr-2">{property.title}</h3>
-        </div>
+        <h3 className="text-lg font-bold text-gray-800 truncate mb-1">{property.title}</h3>
 
-        <p className="text-gray-500 text-sm mb-2 flex items-center gap-1 truncate">
-          <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+        <p className="text-gray-500 text-sm mb-4 flex items-center gap-1 truncate">
+          <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
           {property.location}
         </p>
-
-        {visibleAmenities.length > 0 && (
-          <div className="flex flex-wrap gap-1 mb-3">
-            {visibleAmenities.map((amenity, index) => (
-              <span key={index} className="bg-gray-100 text-gray-600 text-[10px] px-2 py-0.5 rounded-full">{amenity}</span>
-            ))}
-            {amenitiesList.length > 3 && <span className="text-gray-400 text-[10px] px-2 py-0.5">+{amenitiesList.length - 3} more</span>}
-          </div>
-        )}
 
         <div className="mt-auto pt-3 border-t border-gray-50 flex justify-between items-center">
           <div>
