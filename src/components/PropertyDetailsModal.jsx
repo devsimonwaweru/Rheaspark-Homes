@@ -404,9 +404,26 @@ export default function PropertyDetailsModal({ isOpen, onClose, property, isFavo
     return viewFee;
   };
 
-  const handlePaymentSuccess = (success) => {
+  // ✅ BUG FIX 1: Save to database on success
+  const handlePaymentSuccess = async (success) => {
     setShowPayment(false);
     if (success) {
+      // 1. Save unlock to database permanently
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          await supabase.from('unlocks').insert({
+            user_id: user.id,
+            property_id: property.id,
+            amount_paid: getPaymentAmount(),
+            unlock_type: paymentType
+          });
+        }
+      } catch (err) {
+        console.error("Failed to save unlock to DB:", err);
+      }
+
+      // 2. Update UI
       if (paymentType === 'agent_escort') {
         setHasAgentAccess(true);
       } else if (paymentType === 'both') {

@@ -23,7 +23,8 @@ export default function RecordPaymentModal({ isOpen, onClose, unit, tenant, onSa
         amount: parseFloat(amount), // Positive = Payment
         type: 'payment',
         method: method,
-        reference: reference
+        reference: reference,
+        status: 'paid' // ✅ BUG FIX 2: Ensure manual payments are marked as paid
       });
 
       if (error) throw error;
