@@ -1,16 +1,15 @@
+/* eslint-disable no-unused-vars */
 // src/components/PaymentModal.jsx
 import React, { useState, useEffect, useRef } from "react";
 import { supabase } from "../lib/supabaseClient";
 
 export default function PaymentModal({ isOpen, onClose, amount, type, propertyId }) {
   const [phone, setPhone] = useState("");
-  const [status, setStatus] = useState("idle"); // idle | loading | pending | success | failed
-  // eslint-disable-next-line no-unused-vars
+  const [status, setStatus] = useState("idle"); 
   const [paymentId, setPaymentId] = useState(null);
   const [message, setMessage] = useState("");
   const pollingRef = useRef(null);
 
-  // Reset state when modal opens
   useEffect(() => {
     if (isOpen) {
       setPhone("");
@@ -20,14 +19,12 @@ export default function PaymentModal({ isOpen, onClose, amount, type, propertyId
     }
   }, [isOpen]);
 
-  // Cleanup polling on unmount or close
   useEffect(() => {
     return () => {
       if (pollingRef.current) clearInterval(pollingRef.current);
     };
   }, []);
 
-  // 1. Initiate Payment
   const handleInitiate = async (e) => {
     e.preventDefault();
     if (!phone) return setMessage("Please enter phone number");
@@ -37,9 +34,7 @@ export default function PaymentModal({ isOpen, onClose, amount, type, propertyId
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error("Session expired. Please log in again.");
-      }
+      if (!session) throw new Error("Session expired. Please log in again.");
 
       const { data, error: funcError } = await supabase.functions.invoke('initiate-payment', {
         body: { 
@@ -51,29 +46,21 @@ export default function PaymentModal({ isOpen, onClose, amount, type, propertyId
         }
       });
 
-      // ROBUST ERROR HANDLING
       if (funcError) {
-        // Try to parse JSON from the error context, fallback to generic message
-        let errorMessage = "Server error. Please check console or try again.";
-        
+        let errorMessage = "Server error. Please try again.";
         if (funcError.context) {
           try {
-            // Clone response to read safely
             const errorData = await funcError.context.clone().json();
             errorMessage = errorData.error || errorMessage;
-          // eslint-disable-next-line no-unused-vars
           } catch (parseError) {
-            // If parsing fails, it means server returned HTML (500), use generic message
-            console.error("Server returned non-JSON response (likely 500 error)");
+            console.error("Server error");
           }
         }
-        
         throw new Error(errorMessage);
       }
 
       if (data?.error) throw new Error(data.error);
 
-      // Success
       setPaymentId(data.payment_id);
       setStatus("pending");
       setMessage("STK Push sent! Please check your phone...");
@@ -89,21 +76,20 @@ export default function PaymentModal({ isOpen, onClose, amount, type, propertyId
     }
   };
 
-  // 2. Polling Logic
+  // ✅ THE FIX: Call your verify-payment backend function instead of the database
   const startPolling = (id) => {
     if (pollingRef.current) clearInterval(pollingRef.current);
 
     pollingRef.current = setInterval(async () => {
       try {
-        const { data, error } = await supabase
-          .from("payments")
-          .select("status")
-          .eq("id", id)
-          .single();
+        // Actively ask Intasend for the status via your backend
+        const { data, error } = await supabase.functions.invoke('verify-payment', {
+          body: { paymentId: id }
+        });
 
         if (error) throw error;
 
-        if (data.status === "paid" || data.status === "completed") {
+        if (data?.status === "paid") {
           clearInterval(pollingRef.current);
           setStatus("success");
           setMessage("Payment Successful!");
@@ -111,7 +97,7 @@ export default function PaymentModal({ isOpen, onClose, amount, type, propertyId
           setTimeout(() => {
             onClose(true); 
           }, 2000);
-        } else if (data.status === "failed") {
+        } else if (data?.status === "failed") {
           clearInterval(pollingRef.current);
           setStatus("failed");
           setMessage("Payment failed or cancelled.");
@@ -140,7 +126,7 @@ export default function PaymentModal({ isOpen, onClose, amount, type, propertyId
                 <p className="text-gray-500 text-sm">Amount to Pay</p>
                 <h3 className="text-4xl font-bold text-gray-800 my-2">KES {amount}</h3>
                 <span className="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full font-medium uppercase">
-                  {type === 'view_property' ? 'Unlock Details' : 'Subscription Fee'}
+                  {type === 'view_property' ? 'Unlock Details' : type === 'agent_escort' ? 'Agent Escort' : 'Subscription Fee'}
                 </span>
               </div>
 
@@ -211,7 +197,7 @@ export default function PaymentModal({ isOpen, onClose, amount, type, propertyId
             <div className="text-center py-10 space-y-4">
               <div className="w-20 h-20 mx-auto rounded-full bg-red-100 flex items-center justify-center">
                 <svg className="w-10 h-10 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </div>
               <h3 className="text-xl font-bold text-red-600">Payment Failed</h3>
