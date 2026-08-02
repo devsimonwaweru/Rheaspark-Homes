@@ -1,13 +1,25 @@
 // src/pages/FindHouses.jsx
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { Link } from "react-router-dom";
-import { counties, constituencies } from "../data/locations";
 import PropertyCard from "../components/PropertyCard";
 import PropertyDetailsModal from "../components/PropertyDetailsModal";
 
 const FAVORITES_KEY = 'rheaspark_favorites';
+
+// Haversine formula to calculate distance between two coordinates in KM
+const getDistance = (lat1, lon1, lat2, lon2) => {
+  if (!lat1 || !lon1 || !lat2 || !lon2) return Infinity;
+  const R = 6371; 
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+};
 
 export default function FindHouses() {
   const [properties, setProperties] = useState([]);
@@ -18,6 +30,10 @@ export default function FindHouses() {
   // Auth State
   const [authStatus, setAuthStatus] = useState('checking');
   const [session, setSession] = useState(null);
+
+  // Location State
+  const [userLocation, setUserLocation] = useState(null);
+  const [locationStatus, setLocationStatus] = useState('idle'); // idle, fetching, active, denied
 
   // Favorites State - Initialize from localStorage to prevent disappearing on refresh
   const [favorites, setFavorites] = useState(() => {
@@ -36,6 +52,11 @@ export default function FindHouses() {
   });
 
   const [constituencyOptions, setConstituencyOptions] = useState([]);
+
+  // Dynamically generate counties that only have houses
+  const availableCounties = useMemo(() => {
+    return [...new Set(properties.map(p => p.county).filter(Boolean))].sort();
+  }, [properties]);
 
   useEffect(() => {
     const initializeData = async () => {
@@ -103,12 +124,41 @@ export default function FindHouses() {
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
     if (name === 'county') {
-      const constits = value && value !== 'All' ? constituencies[value] : [];
-      setConstituencyOptions(constits);
+      if (value && value !== 'All') {
+        // Dynamically get constituencies that actually have houses in this county
+        const uniqueConstituencies = [...new Set(properties.filter(p => p.county === value && p.constituency).map(p => p.constituency))].sort();
+        setConstituencyOptions(uniqueConstituencies);
+      } else {
+        setConstituencyOptions([]);
+      }
       setFilters(prev => ({ ...prev, county: value, constituency: "All" }));
     } else {
       setFilters(prev => ({ ...prev, [name]: value }));
     }
+  };
+
+  const handleLocateMe = () => {
+    if (!navigator.geolocation) {
+      alert("Geolocation is not supported by your browser.");
+      return;
+    }
+    
+    setLocationStatus('fetching');
+    
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setUserLocation({ 
+          lat: position.coords.latitude, 
+          lng: position.coords.longitude 
+        });
+        setLocationStatus('active');
+      },
+      (error) => {
+        console.error("Location error:", error);
+        setLocationStatus('denied');
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
   };
 
   const handleToggleFavorite = async (propertyId) => {
@@ -155,11 +205,19 @@ export default function FindHouses() {
     return true;
   });
 
-  // Sort: favorites first, then maintain original order
+  // Sort: Favorites first, then by distance if location is active
   const sortedProperties = [...filteredProperties].sort((a, b) => {
     const aFav = favorites.has(a.id) ? 1 : 0;
     const bFav = favorites.has(b.id) ? 1 : 0;
-    return bFav - aFav;
+    if (aFav !== bFav) return bFav - aFav;
+
+    if (userLocation) {
+      const distA = getDistance(userLocation.lat, userLocation.lng, a.latitude, a.longitude);
+      const distB = getDistance(userLocation.lat, userLocation.lng, b.latitude, b.longitude);
+      return distA - distB;
+    }
+
+    return 0;
   });
 
   const handleViewDetails = (property) => { setSelectedProperty(property); setIsModalOpen(true); };
@@ -183,16 +241,88 @@ export default function FindHouses() {
              </div>
              <input type="text" name="searchQuery" value={filters.searchQuery} onChange={handleFilterChange} placeholder="Search by name or location" className="w-full pl-11 pr-4 py-3 border-2 border-gray-200 rounded-xl text-gray-800 focus:border-blue-500 outline-none transition-colors" />
           </div>
+          
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-             <div><label className="block text-xs font-semibold text-gray-500 mb-1">County</label><select name="county" value={filters.county} onChange={handleFilterChange} className="w-full border-2 border-gray-200 rounded-lg p-2.5 text-sm focus:border-blue-500 outline-none bg-white"><option>All</option>{counties.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
-             <div><label className="block text-xs font-semibold text-gray-500 mb-1">Constituency</label><select name="constituency" value={filters.constituency} onChange={handleFilterChange} disabled={filters.county === 'All'} className="w-full border-2 border-gray-200 rounded-lg p-2.5 text-sm focus:border-blue-500 outline-none bg-white disabled:bg-gray-50"><option>All</option>{constituencyOptions.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
-             <div><label className="block text-xs font-semibold text-gray-500 mb-1">Property Type</label><select name="type" value={filters.type} onChange={handleFilterChange} className="w-full border-2 border-gray-200 rounded-lg p-2.5 text-sm focus:border-blue-500 outline-none bg-white"><option>All</option><option>Apartment</option><option>House</option><option>Studio</option><option>Bedsitter</option><option>Single Room</option></select></div>
-             <div><label className="block text-xs font-semibold text-gray-500 mb-1">Bedrooms</label><select name="bedrooms" value={filters.bedrooms} onChange={handleFilterChange} className="w-full border-2 border-gray-200 rounded-lg p-2.5 text-sm focus:border-blue-500 outline-none bg-white"><option>Any</option><option value="0">Studio / 0</option><option value="1">1+</option><option value="2">2+</option><option value="3">3+</option></select></div>
+             <div>
+               <label className="block text-xs font-semibold text-gray-500 mb-1">County</label>
+               <select name="county" value={filters.county} onChange={handleFilterChange} className="w-full border-2 border-gray-200 rounded-lg p-2.5 text-sm focus:border-blue-500 outline-none bg-white">
+                 <option>All</option>
+                 {availableCounties.map(c => <option key={c} value={c}>{c}</option>)}
+               </select>
+             </div>
+             
+             <div>
+               <label className="block text-xs font-semibold text-gray-500 mb-1">Constituency</label>
+               <select name="constituency" value={filters.constituency} onChange={handleFilterChange} disabled={filters.county === 'All' || constituencyOptions.length === 0} className="w-full border-2 border-gray-200 rounded-lg p-2.5 text-sm focus:border-blue-500 outline-none bg-white disabled:bg-gray-50">
+                 <option>All</option>
+                 {constituencyOptions.map(c => <option key={c} value={c}>{c}</option>)}
+               </select>
+             </div>
+             
+             <div>
+               <label className="block text-xs font-semibold text-gray-500 mb-1">Property Type</label>
+               <select name="type" value={filters.type} onChange={handleFilterChange} className="w-full border-2 border-gray-200 rounded-lg p-2.5 text-sm focus:border-blue-500 outline-none bg-white">
+                 <option>All</option>
+                 <option>Apartment</option>
+                 <option>House</option>
+                 <option>Studio</option>
+                 <option>Bedsitter</option>
+                 <option>Single Room</option>
+               </select>
+             </div>
+             
+             <div>
+               <label className="block text-xs font-semibold text-gray-500 mb-1">Bedrooms</label>
+               <select name="bedrooms" value={filters.bedrooms} onChange={handleFilterChange} className="w-full border-2 border-gray-200 rounded-lg p-2.5 text-sm focus:border-blue-500 outline-none bg-white">
+                 <option>Any</option>
+                 <option value="0">Studio / 0</option>
+                 <option value="1">1+</option>
+                 <option value="2">2+</option>
+                 <option value="3">3+</option>
+               </select>
+             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
-              <div><label className="block text-xs font-semibold text-gray-500 mb-1">Min Price (KES)</label><input type="number" name="minPrice" value={filters.minPrice} onChange={handleFilterChange} placeholder="Any" className="w-full border-2 border-gray-200 rounded-lg p-2.5 text-sm focus:border-blue-500 outline-none" /></div>
-              <div><label className="block text-xs font-semibold text-gray-500 mb-1">Max Price (KES)</label><input type="number" name="maxPrice" value={filters.maxPrice} onChange={handleFilterChange} placeholder="Any" className="w-full border-2 border-gray-200 rounded-lg p-2.5 text-sm focus:border-blue-500 outline-none" /></div>
+          
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">Min Price (KES)</label>
+                <input type="number" name="minPrice" value={filters.minPrice} onChange={handleFilterChange} placeholder="Any" className="w-full border-2 border-gray-200 rounded-lg p-2.5 text-sm focus:border-blue-500 outline-none" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">Max Price (KES)</label>
+                <input type="number" name="maxPrice" value={filters.maxPrice} onChange={handleFilterChange} placeholder="Any" className="w-full border-2 border-gray-200 rounded-lg p-2.5 text-sm focus:border-blue-500 outline-none" />
+              </div>
+              
+              {/* Near Me Button */}
+              <div className="flex items-end">
+                <button 
+                  onClick={handleLocateMe} 
+                  className={`w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg font-semibold text-sm transition-all duration-200 border-2 ${
+                    locationStatus === 'active' 
+                      ? 'bg-blue-50 border-blue-500 text-blue-700' 
+                      : 'bg-white border-gray-200 text-gray-600 hover:border-blue-400 hover:text-blue-600'
+                  }`}
+                >
+                  {locationStatus === 'fetching' ? (
+                    <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                  ) : (
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                  )}
+                  {locationStatus === 'active' ? 'Location On' : 'Near Me'}
+                </button>
+              </div>
           </div>
+
+          {/* Location Denied Prompt */}
+          {locationStatus === 'denied' && (
+            <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-xl text-sm flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" /></svg>
+                Location access denied. Enable it in your browser settings to sort by nearest houses.
+              </span>
+              <button onClick={handleLocateMe} className="font-bold underline hover:no-underline flex-shrink-0 ml-4">Try Again</button>
+            </div>
+          )}
         </div>
 
         {/* --- SMART BANNER --- */}
@@ -217,7 +347,12 @@ export default function FindHouses() {
         )}
 
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-bold text-gray-800"><span className="text-blue-600">{sortedProperties.length}</span> Properties Found</h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-xl font-bold text-gray-800"><span className="text-blue-600">{sortedProperties.length}</span> Properties Found</h2>
+            {locationStatus === 'active' && (
+              <span className="text-xs font-semibold bg-blue-100 text-blue-700 px-2.5 py-1 rounded-full">Sorted by nearest</span>
+            )}
+          </div>
           {favorites.size > 0 && (
             <span className="text-sm text-gray-500">
               <span className="text-red-500 font-semibold">{favorites.size}</span> favorited
