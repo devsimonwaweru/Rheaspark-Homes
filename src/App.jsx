@@ -39,6 +39,7 @@ import AdminLandlords from "./pages/AdminLandlords";
 import AdminProperties from "./pages/AdminProperties";
 import AdminMovers from "./pages/AdminMovers";
 import AdminSettings from "./pages/AdminSettings";
+import AdminPayments from "./pages/AdminPayments"; // <-- NEW IMPORT
 
 // NEW: Import JoinPage
 import JoinPage from "./pages/JoinPage";
@@ -102,6 +103,7 @@ function App() {
           <Route path="landlords" element={<AdminLandlords />} />
           <Route path="properties" element={<AdminProperties />} />
           <Route path="movers" element={<AdminMovers />} />
+          <Route path="payments" element={<AdminPayments />} /> {/* <-- NEW ROUTE */}
           <Route path="settings" element={<AdminSettings />} />
         </Route>
 

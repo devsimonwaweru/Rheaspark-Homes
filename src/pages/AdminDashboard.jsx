@@ -36,20 +36,22 @@ const AdminDashboard = () => {
   const fetchStats = async () => {
     setLoading(true);
     try {
-      // Fetch all counts in parallel for speed
       const [
         usersRes, 
         landlordsRes, 
         propertiesRes, 
         activePropsRes, 
-        moversRes
+        moversRes,
+        paymentsRes,
+        activeSubsRes
       ] = await Promise.all([
-        supabase.from('users').select('*', { count: 'exact', head: true }).maybeSingle(), // maybeSingle prevents error if table empty
+        supabase.from('users').select('*', { count: 'exact', head: true }).maybeSingle(),
         supabase.from('landlords').select('*', { count: 'exact', head: true }),
         supabase.from('properties').select('*', { count: 'exact', head: true }),
-        // Specifically count Active properties (visible on FindHouses)
         supabase.from('properties').select('*', { count: 'exact', head: true }).eq('status', 'active'),
         supabase.from('movers').select('*', { count: 'exact', head: true }),
+        supabase.from('payments').select('*', { count: 'exact', head: true }).eq('status', 'completed'),
+        supabase.from('subscriptions').select('*', { count: 'exact', head: true }).eq('status', 'active'),
       ]);
 
       setStats([
@@ -78,7 +80,6 @@ const AdminDashboard = () => {
           iconColor: 'text-[#FF9800]' 
         },
         { 
-          // New Stat: Active Properties
           title: 'Active Listings', 
           value: activePropsRes.count || 0, 
           icon: 'fa-check-circle', 
@@ -94,6 +95,24 @@ const AdminDashboard = () => {
           color: 'border-[#9C27B0]', 
           bgColor: 'bg-purple-50', 
           iconColor: 'text-[#9C27B0]' 
+        },
+        { 
+          title: 'Payments', 
+          value: paymentsRes.count || 0, 
+          icon: 'fa-credit-card', 
+          color: 'border-[#F59E0B]', 
+          bgColor: 'bg-yellow-50', 
+          iconColor: 'text-[#F59E0B]',
+          subtitle: 'Completed'
+        },
+        { 
+          title: 'Active Subs', 
+          value: activeSubsRes.count || 0, 
+          icon: 'fa-crown', 
+          color: 'border-[#EC4899]', 
+          bgColor: 'bg-pink-50', 
+          iconColor: 'text-[#EC4899]',
+          subtitle: 'Recurring'
         },
       ]);
     } catch (error) {
@@ -151,21 +170,21 @@ const AdminDashboard = () => {
         <p className="text-gray-600">Here's what's happening with your platform today.</p>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-5 mb-8">
+      {/* Stats Cards - Updated to handle 7 cards */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-4 mb-8">
         {stats.map((stat, index) => (
           <div 
             key={index}
-            className={`bg-white rounded-xl shadow-sm p-5 border-l-4 ${stat.color} transition-all duration-300 hover:shadow-md cursor-pointer`}
+            className={`bg-white rounded-xl shadow-sm p-4 border-l-4 ${stat.color} transition-all duration-300 hover:shadow-md cursor-pointer`}
           >
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-gray-500 uppercase font-semibold">{stat.title}</p>
-                <p className="text-2xl font-bold text-gray-800 mt-1">{stat.value}</p>
-                {stat.subtitle && <p className="text-[10px] text-gray-400 mt-1">{stat.subtitle}</p>}
+              <div className="min-w-0">
+                <p className="text-[10px] text-gray-500 uppercase font-semibold truncate">{stat.title}</p>
+                <p className="text-xl font-bold text-gray-800 mt-0.5">{stat.value}</p>
+                {stat.subtitle && <p className="text-[9px] text-gray-400 mt-0.5">{stat.subtitle}</p>}
               </div>
-              <div className={`w-10 h-10 rounded-full ${stat.bgColor} flex items-center justify-center`}>
-                <i className={`fas ${stat.icon} ${stat.iconColor} text-lg`}></i>
+              <div className={`w-9 h-9 rounded-full ${stat.bgColor} flex items-center justify-center flex-shrink-0 ml-2`}>
+                <i className={`fas ${stat.icon} ${stat.iconColor} text-sm`}></i>
               </div>
             </div>
           </div>
@@ -202,6 +221,24 @@ const AdminDashboard = () => {
                    <i className="fas fa-users text-gray-400 group-hover:text-blue-600"></i>
                 </div>
                 <span className="font-medium text-gray-700 group-hover:text-blue-600">Manage Users</span>
+             </a>
+             <a href="/admin/payments" className="flex items-center p-3 rounded-lg bg-gray-50 hover:bg-blue-50 hover:text-blue-600 transition-colors group">
+                <div className="w-8 h-8 rounded bg-white shadow-sm flex items-center justify-center mr-3">
+                   <i className="fas fa-credit-card text-gray-400 group-hover:text-blue-600"></i>
+                </div>
+                <span className="font-medium text-gray-700 group-hover:text-blue-600">Payments & Subs</span>
+             </a>
+             <a href="/admin/landlords" className="flex items-center p-3 rounded-lg bg-gray-50 hover:bg-blue-50 hover:text-blue-600 transition-colors group">
+                <div className="w-8 h-8 rounded bg-white shadow-sm flex items-center justify-center mr-3">
+                   <i className="fas fa-user-tie text-gray-400 group-hover:text-blue-600"></i>
+                </div>
+                <span className="font-medium text-gray-700 group-hover:text-blue-600">Manage Landlords</span>
+             </a>
+             <a href="/admin/movers" className="flex items-center p-3 rounded-lg bg-gray-50 hover:bg-blue-50 hover:text-blue-600 transition-colors group">
+                <div className="w-8 h-8 rounded bg-white shadow-sm flex items-center justify-center mr-3">
+                   <i className="fas fa-truck text-gray-400 group-hover:text-blue-600"></i>
+                </div>
+                <span className="font-medium text-gray-700 group-hover:text-blue-600">Manage Movers</span>
              </a>
              <button onClick={() => alert('Feature coming soon')} className="w-full flex items-center p-3 rounded-lg bg-gray-50 hover:bg-blue-50 hover:text-blue-600 transition-colors group">
                 <div className="w-8 h-8 rounded bg-white shadow-sm flex items-center justify-center mr-3">

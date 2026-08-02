@@ -1,3 +1,4 @@
+// src/components/AdminSidebar.jsx
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -22,6 +23,7 @@ const AdminSidebar = ({ closeSidebar }) => {
     { name: 'Landlords', path: '/admin/landlords', icon: 'fa-user-tie' },
     { name: 'Properties', path: '/admin/properties', icon: 'fa-home' },
     { name: 'Movers', path: '/admin/movers', icon: 'fa-truck' },
+    { name: 'Payments', path: '/admin/payments', icon: 'fa-credit-card' }, // <-- ADDED
   ];
 
   const bottomNavItems = [
