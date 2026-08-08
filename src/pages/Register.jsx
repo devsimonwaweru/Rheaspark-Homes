@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { useNavigate, Link } from 'react-router-dom';
 import OtpInput from '../components/OtpInput';
+
+const PENDING_VERIFICATION_KEY = 'rheaspark_pending_verification';
 
 export default function Register() {
   const navigate = useNavigate();
@@ -18,12 +20,47 @@ export default function Register() {
   const [error, setError] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
   const [step, setStep] = useState('form'); // 'form' | 'verify'
+  const [restoredSession, setRestoredSession] = useState(false);
   
   // Temp storage between steps
   const [, setTempUserId] = useState(null);
   
   // Parallax state
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+
+  // On mount: check if there's a pending verification in localStorage
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(PENDING_VERIFICATION_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        // Restore all fields needed for verification
+        setEmail(parsed.email || '');
+        setPassword(parsed.password || '');
+        setRole(parsed.role || 'user');
+        setFullName(parsed.fullName || '');
+        setPhone(parsed.phone || '');
+        setStep('verify');
+        setRestoredSession(true);
+      }
+    // eslint-disable-next-line no-unused-vars
+    } catch (e) {
+      localStorage.removeItem(PENDING_VERIFICATION_KEY);
+    }
+  }, []);
+
+  // Helper to save pending verification state
+  const savePendingVerification = (data) => {
+    localStorage.setItem(PENDING_VERIFICATION_KEY, JSON.stringify({
+      ...data,
+      timestamp: Date.now()
+    }));
+  };
+
+  // Helper to clear pending verification state
+  const clearPendingVerification = () => {
+    localStorage.removeItem(PENDING_VERIFICATION_KEY);
+  };
 
   const handleMouseMove = (e) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -67,7 +104,7 @@ export default function Register() {
 
       if (authError) throw authError;
       const userId = authData.user.id;
-      setTempUserId(userId); // Save for later
+      setTempUserId(userId);
 
       const baseData = { 
         id: userId, 
@@ -96,7 +133,10 @@ export default function Register() {
       // 3. Trigger OTP Email
       await callEdgeFunction('send');
       
-      // 4. Move to OTP step
+      // 4. Persist to localStorage BEFORE moving to OTP step
+      savePendingVerification({ email, password, role, fullName, phone });
+
+      // 5. Move to OTP step
       setStep('verify');
 
     } catch (err) {
@@ -128,6 +168,9 @@ export default function Register() {
       // This single backend call: Verifies OTP, Confirms Email in Supabase, Sends Welcome Email
       await callEdgeFunction('finalize_verification', { otp: otpCode });
 
+      // Clear the persisted state immediately on success
+      clearPendingVerification();
+
       // Log the user in automatically
       const { error: loginError } = await supabase.auth.signInWithPassword({
         email,
@@ -145,6 +188,13 @@ export default function Register() {
       setError(err.message);
       setLoading(false);
     }
+  };
+
+  // Handle "Go Back" — clear persisted state so they start fresh
+  const handleGoBack = () => {
+    clearPendingVerification();
+    setStep('form');
+    setError(null);
   };
 
   return (
@@ -185,9 +235,24 @@ export default function Register() {
               {step === 'form' ? 'Create Account' : 'Verify Your Email'}
             </h2>
             <p className="text-gray-400">
-              {step === 'form' ? 'Fill in your details to get started' : 'We sent a code to your email address'}
+              {step === 'form' 
+                ? 'Fill in your details to get started' 
+                : restoredSession 
+                  ? `Welcome back! You still need to verify ${email}`
+                  : 'We sent a code to your email address'
+              }
             </p>
           </div>
+
+          {/* Restored session banner */}
+          {restoredSession && step === 'verify' && (
+            <div className="bg-amber-50 text-amber-700 p-3.5 rounded-xl mb-4 text-sm border border-amber-200 flex items-center gap-2">
+              <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+              <span>Your account was created but not yet verified. Please enter the OTP sent to your email.</span>
+            </div>
+          )}
 
           {error && (
             <div className="bg-red-50 text-red-500 p-4 rounded-xl mb-4 text-sm border border-red-100 flex items-center">
@@ -256,7 +321,7 @@ export default function Register() {
           {step === 'verify' && (
             <div className="mt-6">
               <button 
-                onClick={() => { setStep('form'); setError(null); }} 
+                onClick={handleGoBack} 
                 className="w-full text-sm text-gray-500 hover:text-gray-700 flex items-center justify-center gap-1 transition-colors"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>

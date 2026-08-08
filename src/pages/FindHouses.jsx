@@ -103,14 +103,11 @@ export default function FindHouses() {
   const fetchProperties = async () => {
     setLoading(true);
     try {
-      await supabase.rpc('expire_overdue_verifications');
-
+      // Fetch ALL properties - no status or auto_hidden filtering
       const { data, error } = await supabase
         .from("properties")
         .select("*")
-        .eq("status", "active")
-        .eq("auto_hidden", false)
-        .order('last_verified_at', { ascending: false });
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
       setProperties(data || []);
@@ -230,7 +227,7 @@ export default function FindHouses() {
             Find Your{" "}
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-emerald-500">Perfect Home</span>
           </h1>
-          <p className="text-gray-500 text-lg">Browse verified, up-to-date listings.</p>
+          <p className="text-gray-500 text-lg">Browse all available listings.</p>
         </div>
 
         {/* Filter UI */}
