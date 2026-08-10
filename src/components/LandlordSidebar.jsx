@@ -9,36 +9,22 @@ export default function LandlordSidebar({ onAddProperty }) {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Fetch Profile & Check Subscription Expiry
+  // Fetch Profile (Subscription check removed for testing)
   useEffect(() => {
     const getProfile = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         const { data } = await supabase
           .from('landlords')
-          .select('full_name, business_name, subscription_status, subscription_ends_at')
+          .select('full_name, business_name')
           .eq('id', user.id)
           .single();
         
-        if (data) {
-          // Check if subscription has expired locally
-          if (data.subscription_status === 'active' && data.subscription_ends_at) {
-            const now = new Date();
-            const end = new Date(data.subscription_ends_at);
-            if (now > end) {
-              // Subscription expired
-              setProfile({ ...data, subscription_status: 'inactive' });
-            } else {
-              setProfile(data);
-            }
-          } else {
-            setProfile(data);
-          }
-        }
+        if (data) setProfile(data);
       }
     };
     getProfile();
-  }, [location]); // Re-check on location change to refresh state after subscription
+  }, [location]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -49,9 +35,6 @@ export default function LandlordSidebar({ onAddProperty }) {
     setIsOpen(false);
     onAddProperty();
   };
-
-  // Determine if user is Pro
-  const isPro = profile?.subscription_status === 'active';
 
   // Modern Nav Item Class
   const navItemClass = (isActive) => `
@@ -101,12 +84,6 @@ export default function LandlordSidebar({ onAddProperty }) {
             </div>
             <h3 className="font-bold text-gray-800 text-sm">{profile?.full_name || 'Landlord'}</h3>
             <p className="text-xs text-gray-400">{profile?.business_name || 'Property Manager'}</p>
-            
-            {isPro && (
-              <span className="mt-2 px-3 py-1 text-[10px] font-bold rounded-full bg-gradient-to-r from-amber-400 to-orange-500 text-white shadow-sm animate-pulse">
-                PRO MEMBER
-              </span>
-            )}
           </div>
 
           {/* Navigation */}
@@ -132,52 +109,25 @@ export default function LandlordSidebar({ onAddProperty }) {
               <span>Add Property</span>
             </button>
 
-            {/* --- CONDITIONAL RENDERING --- */}
-            
-            {isPro ? (
-              /* --- PRO USER: FULL MANAGEMENT MENU --- */
-              <div className="mt-4 pt-4 border-t border-gray-100 space-y-1">
-                <span className="px-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Management</span>
-                
-                <Link to="/landlord/rentals" onClick={() => setIsOpen(false)} className="flex items-center space-x-3 py-3 px-4 rounded-xl text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium transition-colors">
-                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
-                   <span>Tenants</span>
-                </Link>
+            {/* --- UNLOCKED MANAGEMENT MENU --- */}
+            <div className="mt-4 pt-4 border-t border-gray-100 space-y-1">
+              <span className="px-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Management</span>
+              
+              <Link to="/landlord/rentals" onClick={() => setIsOpen(false)} className={navItemClass(location.pathname === '/landlord/rentals')}>
+                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                 <span>Tenants</span>
+              </Link>
 
-                <Link to="/landlord/payments" onClick={() => setIsOpen(false)} className="flex items-center space-x-3 py-3 px-4 rounded-xl text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium transition-colors">
-                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
-                   <span>Payments</span>
-                </Link>
-                
-                <Link to="/landlord/maintenance" onClick={() => setIsOpen(false)} className="flex items-center space-x-3 py-3 px-4 rounded-xl text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium transition-colors">
-                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                   <span>Maintenance</span>
-                </Link>
-              </div>
-            ) : (
-              /* --- FREE USER: MARKETING BANNER --- */
-              <div className="mt-6 relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-indigo-500 rounded-2xl blur-xl opacity-30 animate-pulse"></div>
-                <div className="relative bg-white border border-gray-100 p-5 rounded-2xl shadow-xl">
-                  <div className="flex flex-col items-center text-center">
-                    <div className="w-12 h-12 bg-indigo-50 rounded-full flex items-center justify-center mb-3 ring-4 ring-indigo-100">
-                      <svg className="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
-                    </div>
-                    <h4 className="font-bold text-gray-900 text-sm mb-1">Unlock Pro</h4>
-                    <p className="text-[11px] text-gray-500 mb-4 leading-relaxed">
-                      Automate rent, track tenants, and generate reports.
-                    </p>
-                    <Link 
-                      to="/subscribe" 
-                      onClick={() => setIsOpen(false)}
-                      className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs font-bold py-2.5 px-4 rounded-xl hover:shadow-lg hover:shadow-blue-500/30 transition-all duration-300 transform hover:-translate-y-0.5"
-                    >
-                      Subscribe Now
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            )}
+              <Link to="/landlord/payments" onClick={() => setIsOpen(false)} className={navItemClass(location.pathname === '/landlord/payments')}>
+                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
+                 <span>Payments</span>
+              </Link>
+              
+              <Link to="/landlord/maintenance" onClick={() => setIsOpen(false)} className={navItemClass(location.pathname === '/landlord/maintenance')}>
+                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                 <span>Maintenance</span>
+              </Link>
+            </div>
 
           </nav>
           

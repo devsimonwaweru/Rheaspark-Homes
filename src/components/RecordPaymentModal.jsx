@@ -1,12 +1,21 @@
-// src/components/RecordPaymentModal.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
 
-export default function RecordPaymentModal({ isOpen, onClose, unit, tenant, onSave }) {
+export default function RecordPaymentModal({ isOpen, onClose, unit, tenant, balance, onSave }) {
   const [amount, setAmount] = useState('');
   const [method, setMethod] = useState('M-Pesa');
   const [reference, setReference] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // NEW: Auto-fill the amount with the outstanding balance when modal opens
+  useEffect(() => {
+    if (isOpen && balance > 0) {
+      setAmount(balance.toString());
+    } else {
+      setAmount('');
+    }
+    setReference('');
+  }, [isOpen, balance]);
 
   if (!isOpen) return null;
 
@@ -20,16 +29,16 @@ export default function RecordPaymentModal({ isOpen, onClose, unit, tenant, onSa
       const { error } = await supabase.from('payments').insert({
         unit_id: unit.id,
         tenant_id: tenant?.id || null,
-        amount: parseFloat(amount), // Positive = Payment
+        amount: parseFloat(amount),
         type: 'payment',
         method: method,
         reference: reference,
-        status: 'paid' // ✅ BUG FIX 2: Ensure manual payments are marked as paid
+        status: 'paid'
       });
 
       if (error) throw error;
-      onSave(); // Refresh data
-      onClose(); // Close modal
+      onSave(); 
+      onClose(); 
     } catch (err) {
       alert(err.message);
     } finally {
@@ -43,7 +52,7 @@ export default function RecordPaymentModal({ isOpen, onClose, unit, tenant, onSa
         <div className="bg-blue-600 p-4 text-white flex justify-between items-center">
           <div>
             <h3 className="font-bold">Record Payment</h3>
-            <p className="text-sm text-blue-100">{unit?.unit_name}</p>
+            <p className="text-sm text-blue-100">{unit?.unit_name} • {tenant?.full_name || 'No Tenant'}</p>
           </div>
           <button onClick={onClose} className="text-white/70 hover:text-white">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
@@ -51,8 +60,15 @@ export default function RecordPaymentModal({ isOpen, onClose, unit, tenant, onSa
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {/* Context Note */}
+          {balance > 0 && (
+            <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs p-3 rounded-lg">
+              Outstanding balance: <span className="font-bold">KES {balance.toLocaleString()}</span>. Amount has been auto-filled.
+            </div>
+          )}
+
           <div>
-            <label className="text-sm font-bold text-gray-600 block mb-1">Amount (KES)</label>
+            <label className="text-sm font-bold text-gray-600 block mb-1">Amount Paid (KES)</label>
             <input 
               type="number" 
               value={amount} 
@@ -64,7 +80,7 @@ export default function RecordPaymentModal({ isOpen, onClose, unit, tenant, onSa
           </div>
 
           <div>
-            <label className="text-sm font-bold text-gray-600 block mb-1">Method</label>
+            <label className="text-sm font-bold text-gray-600 block mb-1">Payment Method</label>
             <select 
               value={method} 
               onChange={(e) => setMethod(e.target.value)}
@@ -78,13 +94,17 @@ export default function RecordPaymentModal({ isOpen, onClose, unit, tenant, onSa
           </div>
 
           <div>
-            <label className="text-sm font-bold text-gray-600 block mb-1">Reference (Optional)</label>
+            <label className="text-sm font-bold text-gray-600 block mb-1">
+              M-Pesa Confirmation Code 
+              {method === 'M-Pesa' && <span className="text-red-500 font-normal ml-1">*</span>}
+            </label>
             <input 
               type="text" 
               value={reference} 
-              onChange={(e) => setReference(e.target.value)} 
-              className="w-full border-2 border-gray-200 rounded-xl p-3 outline-none"
-              placeholder="M-Pesa Code / Receipt No"
+              onChange={(e) => setReference(e.target.value.toUpperCase())} // Auto uppercase for M-Pesa codes
+              className="w-full border-2 border-gray-200 rounded-xl p-3 outline-none tracking-widest font-mono"
+              placeholder="e.g. QJK3L5F9X2"
+              required={method === 'M-Pesa'}
             />
           </div>
 
