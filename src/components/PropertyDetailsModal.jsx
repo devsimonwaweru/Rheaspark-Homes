@@ -304,7 +304,6 @@ export default function PropertyDetailsModal({ isOpen, onClose, property, isFavo
     return viewFee;
   };
 
-  // ✅ FIXED: Only update UI, backend handles DB insert
   const handlePaymentSuccess = async (success) => {
     setShowPayment(false);
     if (success) {
@@ -473,11 +472,11 @@ export default function PropertyDetailsModal({ isOpen, onClose, property, isFavo
               <div className="relative bg-gray-50 rounded-xl overflow-hidden">
                 <div className="p-4 blur-[4px] select-none"><p className="font-mono text-gray-400 text-lg">+254 7XX XXX XXX</p><p className="text-sm text-gray-300 mt-1">📍 Exact location hidden</p></div>
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="flex items-center gap-2 bg-white/90 backdrop-blur-sm px-4 py-2 rounded-full shadow-sm"><svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg><span className="text-sm font-medium text-gray-500">Unlock to view</span></div>
+                  <div className="flex items-center gap-2 bg-white/90 backdrop-blur-sm px-4 py-2 rounded-full shadow-sm"><svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg><span className="text-sm font-medium text-gray-500">Unlock to book</span></div>
                 </div>
               </div>
               <button onClick={() => setShowUnlockOptions(true)} disabled={feesLoading} className="w-full flex items-center justify-center gap-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white py-4 rounded-xl transition-all shadow-lg shadow-blue-200 active:scale-[0.98] font-bold text-base disabled:opacity-60">
-                {feesLoading ? (<div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />) : (<><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>Unlock Property Details</>)}
+                {feesLoading ? (<div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />) : (<><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>Unlock to Book</>)}
               </button>
               <p className="text-center text-xs text-gray-400">Choose a plan that suits you</p>
             </div>
@@ -492,7 +491,7 @@ export default function PropertyDetailsModal({ isOpen, onClose, property, isFavo
               <div className="flex justify-center pt-3 pb-1 sm:hidden"><div className="w-10 h-1 bg-gray-300 rounded-full" /></div>
               <div className="p-5 sm:p-6">
                 <div className="flex items-center justify-between mb-5">
-                  <div><h3 className="text-xl font-bold text-gray-900">Unlock Property</h3><p className="text-sm text-gray-500 mt-0.5">Select a plan that works for you</p></div>
+                  <div><h3 className="text-xl font-bold text-gray-900">Unlock to Book</h3><p className="text-sm text-gray-500 mt-0.5">Select a plan that works for you</p></div>
                   <button onClick={() => setShowUnlockOptions(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors"><svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
                 </div>
                 <div className="flex items-center gap-3 bg-gray-50 rounded-xl p-3 mb-5">
@@ -504,7 +503,7 @@ export default function PropertyDetailsModal({ isOpen, onClose, property, isFavo
                     <div className="flex items-start justify-between">
                       <div className="flex items-start gap-3">
                         <div className="w-11 h-11 bg-blue-50 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:bg-blue-100 transition-colors"><svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg></div>
-                        <div><p className="font-bold text-gray-900 text-sm">View Details</p><p className="text-xs text-gray-500 mt-0.5">Get phone number & exact location</p><div className="flex flex-wrap gap-1.5 mt-2"><span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">Phone Number</span><span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">GPS Location</span><span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">Directions</span></div></div>
+                        <div><p className="font-bold text-gray-900 text-sm">Book Property</p><p className="text-xs text-gray-500 mt-0.5">Get phone number & exact location</p><div className="flex flex-wrap gap-1.5 mt-2"><span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">Phone Number</span><span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">GPS Location</span><span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">Directions</span></div></div>
                       </div>
                       <div className="text-right flex-shrink-0 ml-3"><p className="text-lg font-bold text-gray-900">KES {viewFee}</p></div>
                     </div>

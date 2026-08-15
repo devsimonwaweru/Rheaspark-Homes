@@ -77,6 +77,9 @@ export default function Home() {
   const handleViewDetails = (property) => { setSelectedProperty(property); setIsModalOpen(true); };
   const handleCloseModal = () => { setIsModalOpen(false); setSelectedProperty(null); };
 
+  const searchLink = authStatus === 'guest' ? '/login' : '/find-houses';
+  const listingsLink = authStatus === 'guest' ? '/login' : '/find-houses';
+
   return (
     <main>
       {/* HERO SECTION */}
@@ -98,8 +101,8 @@ export default function Home() {
                 Rheaspark eliminates the stress of house hunting with <span className="font-semibold text-primary-blue">verified listings</span> and <span className="font-semibold text-primary-green">trusted moving services</span>.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
-                <Link to="/find-houses">
-                  <GradientButton size="lg"><i className="fas fa-search mr-2"></i> Start Your Search</GradientButton>
+                <Link to={searchLink}>
+                  <GradientButton size="lg"><i className="fas fa-search mr-2"></i> {authStatus === 'guest' ? 'Login to Search' : 'Start Your Search'}</GradientButton>
                 </Link>
               </div>
             </div>
@@ -145,7 +148,7 @@ export default function Home() {
             </div>
           )}
           <div className="text-center mt-12">
-            <Link to="/find-houses"><GradientButton size="lg"><i className="fas fa-th-large mr-2"></i> View All Listings</GradientButton></Link>
+            <Link to={listingsLink}><GradientButton size="lg"><i className="fas fa-th-large mr-2"></i> {authStatus === 'guest' ? 'Login to View All Listings' : 'View All Listings'}</GradientButton></Link>
           </div>
         </div>
       </section>

@@ -142,7 +142,7 @@ export default function PropertyCard({ property, onViewDetails, isFavorite, onTo
         )}
       </div>
 
-      {/* Content - Cleaned Up */}
+      {/* Content */}
       <div className="p-5 flex flex-col flex-grow">
         <h3 className="text-lg font-bold text-gray-800 truncate mb-1">{property.title}</h3>
 
@@ -159,9 +159,9 @@ export default function PropertyCard({ property, onViewDetails, isFavorite, onTo
 
           <button
             onClick={() => onViewDetails(property)}
-            className="bg-gray-100 hover:bg-blue-600 text-gray-700 hover:text-white px-4 py-2 rounded-lg font-semibold text-sm transition-colors duration-200"
+            className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-semibold text-sm transition-colors duration-200 shadow-sm shadow-blue-200 active:scale-[0.97]"
           >
-            View Details
+            Book
           </button>
         </div>
       </div>
