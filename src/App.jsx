@@ -18,6 +18,10 @@ import UpdatePassword from "./pages/UpdatePassword";
 import UserDashboard from "./pages/UserDashboard";
 import SubscriptionPage from "./pages/SubscriptionPage";
 
+// ── SHORT-STAY ADDITION (1 of 2): new pages ──
+import ShortStays from "./pages/ShortStays";
+import MyShortStayBookings from "./pages/MyShortStayBookings";
+
 // Landlord Pages
 import LandlordDashboard from "./pages/LandlordDashboard";
 import LandlordHome from "./pages/LandlordHome";
@@ -109,6 +113,8 @@ function App() {
 
         {/* USER */}
         <Route path="/user/dashboard" element={session ? <UserDashboard /> : <Navigate to="/login" replace />} />
+        {/* ── SHORT-STAY ADDITION (2 of 2): guest's own bookings, protected ── */}
+        <Route path="/my-stay-bookings" element={session ? <MyShortStayBookings /> : <Navigate to="/login" replace />} />
         <Route path="/subscribe" element={session ? <SubscriptionPage /> : <Navigate to="/login" replace />} />
 
         {/* NEW: PUBLIC JOIN LINK (No Header/Footer) */}
@@ -135,6 +141,8 @@ function App() {
         {/* PUBLIC */}
         <Route path="/" element={<PublicLayout><Home /></PublicLayout>} />
         <Route path="/find-houses" element={<PublicLayout><FindHouses /></PublicLayout>} />
+        {/* ── SHORT-STAY ADDITION: public marketplace page (Header/Footer) ── */}
+        <Route path="/short-stays" element={<PublicLayout><ShortStays /></PublicLayout>} />
         <Route path="/movers" element={<PublicLayout><MoversPage /></PublicLayout>} />
         
         <Route path="*" element={<Navigate to="/" replace />} />

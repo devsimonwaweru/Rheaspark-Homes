@@ -82,9 +82,11 @@ export default function AddPropertyModal({ isOpen, onClose }) {
     issues: "", solutions: "",
     landlord_name: "", landlord_phone: "", landlord_email: "",
     latitude: null, longitude: null,
+    /* ── SHORT-STAY ADDITION (1 of 4): new form fields ── */
+    listing_type: "long_term",
+    price_per_night: "",
   });
 
-  // Dynamic options for constituency dropdown
   const [constituencyOptions, setConstituencyOptions] = useState([]);
   const [amenities, setAmenities] = useState([]);
 
@@ -108,7 +110,6 @@ export default function AddPropertyModal({ isOpen, onClose }) {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  // Handler: County Change -> Update Constituency List & Reset
   const handleCountyChange = (e) => {
     const selectedCounty = e.target.value;
     const constits = selectedCounty ? constituencies[selectedCounty] : [];
@@ -124,7 +125,6 @@ export default function AddPropertyModal({ isOpen, onClose }) {
     }));
   };
 
-  // Handler: Constituency Change
   const handleConstituencyChange = (e) => {
     const selectedConstituency = e.target.value;
     
@@ -135,7 +135,6 @@ export default function AddPropertyModal({ isOpen, onClose }) {
     }));
   };
 
-  // Handler: Town/Area Input (Free Text)
   const handleTownChange = (e) => {
     const town = e.target.value;
     setFormData(prev => ({
@@ -145,7 +144,6 @@ export default function AddPropertyModal({ isOpen, onClose }) {
     }));
   };
 
-  // Handler: Landmark Input
   const handleLandmarkChange = (e) => {
     const landmark = e.target.value;
     setFormData(prev => ({
@@ -235,6 +233,11 @@ export default function AddPropertyModal({ isOpen, onClose }) {
 
   const handleSubmit = async () => {
     if (imageFiles.length === 0) return alert("Please upload at least one image");
+
+    /* ── SHORT-STAY ADDITION (2 of 4): validate nightly price ── */
+    if (formData.listing_type !== "long_term" && !formData.price_per_night) {
+      return alert("Please enter a Price Per Night for short-stay listings.");
+    }
     
     setLoading(true);
     try {
@@ -249,7 +252,7 @@ export default function AddPropertyModal({ isOpen, onClose }) {
       const propertyData = {
         ...formData,
         landlord_id: user.id,
-        price: parseFloat(formData.price),
+        price: parseFloat(formData.price) || 0,
         security_deposit: parseFloat(formData.security_deposit || 0),
         bedrooms: parseInt(formData.bedrooms),
         bathrooms: parseInt(formData.bathrooms),
@@ -259,6 +262,10 @@ export default function AddPropertyModal({ isOpen, onClose }) {
         status: "active",
         latitude: formData.latitude ? parseFloat(formData.latitude) : null,
         longitude: formData.longitude ? parseFloat(formData.longitude) : null,
+        /* ── SHORT-STAY ADDITION (3 of 4): persist new fields ── */
+        listing_type: formData.listing_type || "long_term",
+        ...(formData.listing_type !== "long_term" && formData.price_per_night
+          ? { price_per_night: parseFloat(formData.price_per_night) } : {}),
       };
 
       // 3. Insert Property
@@ -278,7 +285,7 @@ export default function AddPropertyModal({ isOpen, onClose }) {
             property_id: newProperty.id,
             unit_name: `Unit ${i}`,
             status: 'vacant',
-            monthly_rent: propertyData.price // <--- AUTO-FILL RENT FROM PROPERTY PRICE
+            monthly_rent: propertyData.price
           });
         }
 
@@ -321,7 +328,6 @@ export default function AddPropertyModal({ isOpen, onClose }) {
           <div className="space-y-5 animate-fade-in">
             <h3 className="text-xl font-bold text-gray-800 mb-2">Location Details</h3>
             
-            {/* County & Constituency Dropdowns */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               <Select 
                 label="County" 
@@ -345,7 +351,6 @@ export default function AddPropertyModal({ isOpen, onClose }) {
               />
             </div>
 
-            {/* Town and Landmark are Free Text Inputs */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 <Input 
                     label="Town / Area" 
@@ -365,13 +370,11 @@ export default function AddPropertyModal({ isOpen, onClose }) {
                 />
             </div>
 
-            {/* Location Preview */}
             <div className="p-3 bg-gray-50 rounded-lg text-sm text-gray-500 border border-dashed">
                 <span className="font-medium text-gray-700">Full Address:</span> 
                 {formData.location || 'Select location above'}
             </div>
 
-            {/* Specs */}
             <div className="grid grid-cols-2 gap-5 pt-4 border-t">
                 <Input label="Size (sqft)" name="size" value={formData.size} onChange={handleChange} placeholder="1200" color="green" />
                 <Select label="Parking" name="parking" value={formData.parking} onChange={handleChange} options={["None", "Shared", "1 Dedicated", "2+"]} color="green" />
@@ -406,7 +409,6 @@ export default function AddPropertyModal({ isOpen, onClose }) {
           </div>
         );
 
-      // --- UPDATED STEP 3: SIMPLIFIED UNITS ---
       case 3:
         return (
           <div className="space-y-5 animate-fade-in">
@@ -466,11 +468,51 @@ export default function AddPropertyModal({ isOpen, onClose }) {
               <Input label="Solutions/Mitigation" name="solutions" value={formData.solutions} onChange={handleChange} placeholder="e.g. Borehole available" color="gray" />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-              <Input label="Rent (KES)" name="price" type="number" value={formData.price} onChange={handleChange} required />
+              {/* ── SHORT-STAY ADDITION (4 of 4a): Rent only required for long-term ── */}
+              <Input label="Rent (KES)" name="price" type="number" value={formData.price} onChange={handleChange}
+                required={formData.listing_type !== "short_stay"} />
               <Input label="Deposit (KES)" name="security_deposit" type="number" value={formData.security_deposit} onChange={handleChange} />
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1.5">Availability</label>
                 <input name="availability_date" type="date" value={formData.availability_date} onChange={handleChange} className="w-full bg-white border-2 border-blue-200 focus:border-blue-500 focus:ring-blue-100 rounded-xl p-3.5 text-gray-800 transition-all outline-none focus:ring-2" />
+              </div>
+            </div>
+
+            {/* ── SHORT-STAY ADDITION (4 of 4b): new section, purely appended ── */}
+            <div className="bg-blue-50 p-5 rounded-xl border-2 border-blue-100 space-y-4">
+              <h4 className="font-semibold text-blue-900 flex items-center">
+                <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M12.316 3.486a.5.5 0 01.485.25L17.5 11.5a.5.5 0 01-.431.748H13v6a1 1 0 01-1 1H8a1 1 0 01-1-1v-6H2.93a.5.5 0 01-.43-.748l4.699-7.764a.5.5 0 01.485-.25z" clipRule="evenodd" /></svg>
+                Short-Stay Pricing (Optional)
+              </h4>
+              <p className="text-xs text-gray-500 -mt-2">
+                Also list this property for nightly bookings (Airbnb-style)? Leave as Long-Term if not.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Listing Type</label>
+                  <select
+                    name="listing_type"
+                    value={formData.listing_type}
+                    onChange={handleChange}
+                    className="w-full bg-white border-2 border-blue-200 focus:border-blue-500 focus:ring-blue-100 rounded-xl p-3.5 text-gray-800 transition-all outline-none focus:ring-2 cursor-pointer"
+                  >
+                    <option value="long_term">Long-Term Rental (monthly)</option>
+                    <option value="short_stay">Short-Stay Only (nightly)</option>
+                    <option value="both">Both (nightly + monthly)</option>
+                  </select>
+                </div>
+                {formData.listing_type !== "long_term" && (
+                  <Input
+                    label="Price Per Night (KES)"
+                    name="price_per_night"
+                    type="number"
+                    value={formData.price_per_night}
+                    onChange={handleChange}
+                    placeholder="e.g. 1200"
+                    color="green"
+                    required={formData.listing_type !== "long_term"}
+                  />
+                )}
               </div>
             </div>
           </div>

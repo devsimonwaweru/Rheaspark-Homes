@@ -9,7 +9,6 @@ export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [openDropdown, setOpenDropdown] = useState(null);
   const [session, setSession] = useState(null);
-  // Store name, role, and the correct dashboard path
   const [userProfile, setUserProfile] = useState({ name: null, role: null, path: "/" });
 
   useEffect(() => {
@@ -35,12 +34,11 @@ export default function Header() {
         // 1. Check Landlord
         const { data: landlordData } = await supabase
           .from('landlords')
-          .select('full_name, subscription_status') // Fetch subscription_status
+          .select('full_name, subscription_status')
           .eq('id', userId)
           .single();
 
         if (landlordData) {
-          // If not subscribed, send them to subscription page on click
           const targetPath = landlordData.subscription_status === 'active' 
             ? '/landlord' 
             : '/subscription';
@@ -145,6 +143,12 @@ export default function Header() {
                 <span className="absolute bottom-0 left-0 w-0 h-[2px] bg-gradient-to-r from-[#2FA4E7] to-[#3CB371] rounded-full transition-all duration-300 group-hover:w-full"></span>
               </Link>
 
+              {/* ── SHORT-STAY ADDITION (1 of 2): Desktop nav ── */}
+              <Link to="/short-stays" className="relative font-medium text-white/90 hover:text-white transition-colors duration-300 py-2 group">
+                Short Stays
+                <span className="absolute bottom-0 left-0 w-0 h-[2px] bg-gradient-to-r from-[#2FA4E7] to-[#3CB371] rounded-full transition-all duration-300 group-hover:w-full"></span>
+              </Link>
+
               <Link to="/movers" className="relative font-medium text-white/90 hover:text-white transition-colors duration-300 py-2 group">
                 Moving Services
                 <span className="absolute bottom-0 left-0 w-0 h-[2px] bg-gradient-to-r from-[#2FA4E7] to-[#3CB371] rounded-full transition-all duration-300 group-hover:w-full"></span>
@@ -188,7 +192,6 @@ export default function Header() {
                         <div className="text-xs text-gray-500 mt-1">Manage your account</div>
                       </Link>
 
-                      {/* Show specific dashboard link if role is explicit */}
                       {(userProfile.role === 'landlord' || userProfile.role === 'mover') && (
                          <Link
                          to={userProfile.path}
@@ -309,6 +312,11 @@ export default function Header() {
               Find Houses
             </Link>
 
+            {/* ── SHORT-STAY ADDITION (2 of 2): Mobile menu ── */}
+            <Link to="/short-stays" onClick={toggleMobileMenu} className="block py-3 px-4 rounded-lg font-medium hover:bg-blue-50 hover:text-[#2FA4E7] transition-colors">
+              Short Stays
+            </Link>
+
             <Link to="/movers" onClick={toggleMobileMenu} className="block py-3 px-4 rounded-lg font-medium hover:bg-blue-50 hover:text-[#2FA4E7] transition-colors">
               Moving Services
             </Link>
@@ -318,7 +326,6 @@ export default function Header() {
           <div className="mt-auto pt-6 border-t border-gray-100 space-y-2">
             {session ? (
               <>
-                {/* Dynamic Profile Link */}
                 <Link 
                   to={userProfile.path}
                   onClick={toggleMobileMenu}

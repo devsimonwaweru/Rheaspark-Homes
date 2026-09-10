@@ -51,6 +51,9 @@ export default function PropertyCard({ property, onViewDetails, isFavorite, onTo
   const available = property.available_units || 0;
   const total = property.total_units || 1;
 
+  // ── SHORT-STAY ADDITION (1 of 3) ──
+  const isShortStay = property.price_per_night != null;
+
   const handleNext = (e) => {
     e.stopPropagation();
     setCurrentIndex((prev) => (prev + 1) % imageList.length);
@@ -154,14 +157,19 @@ export default function PropertyCard({ property, onViewDetails, isFavorite, onTo
         <div className="mt-auto pt-3 border-t border-gray-50 flex justify-between items-center">
           <div>
             <p className="text-xs text-gray-400">Price</p>
-            <p className="text-xl font-extrabold text-gray-800">KES <span className="text-blue-600">{property.price?.toLocaleString()}</span></p>
+            {/* ── SHORT-STAY ADDITION (2 of 3): nightly vs monthly ── */}
+            <p className="text-xl font-extrabold text-gray-800">
+              KES <span className="text-blue-600">{(isShortStay ? property.price_per_night : property.price)?.toLocaleString()}</span>
+              <span className="text-xs font-medium text-gray-400 ml-1">{isShortStay ? "/ night" : "/ month"}</span>
+            </p>
           </div>
 
           <button
             onClick={() => onViewDetails(property)}
             className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-semibold text-sm transition-colors duration-200 shadow-sm shadow-blue-200 active:scale-[0.97]"
           >
-            Book
+            {/* ── SHORT-STAY ADDITION (3 of 3) ── */}
+            {isShortStay ? "Book Now" : "Book"}
           </button>
         </div>
       </div>
