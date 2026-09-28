@@ -6,6 +6,7 @@ import { supabase } from "./lib/supabaseClient";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
 import WhatsAppButton from "./components/WhatsAppButton";
+import SanityMigrationUploader from "./components/SanityMigrationUploader";
 
 // Pages
 import Home from "./pages/Home";
@@ -43,7 +44,7 @@ import AdminLandlords from "./pages/AdminLandlords";
 import AdminProperties from "./pages/AdminProperties";
 import AdminMovers from "./pages/AdminMovers";
 import AdminSettings from "./pages/AdminSettings";
-import AdminPayments from "./pages/AdminPayments"; // <-- NEW IMPORT
+import AdminPayments from "./pages/AdminPayments";
 
 // NEW: Import JoinPage
 import JoinPage from "./pages/JoinPage";
@@ -68,85 +69,239 @@ function App() {
       setSession(session);
       setLoading(false);
     });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
     });
+
     return () => subscription.unsubscribe();
   }, []);
 
-  if (loading) return <div className="flex items-center justify-center min-h-screen text-gray-500">Loading...</div>;
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen text-gray-500">
+        Loading...
+      </div>
+    );
+  }
 
   // --- PASSWORD RESET INTERCEPTOR ---
   if (typeof window !== "undefined") {
     const searchParams = new URLSearchParams(window.location.search);
-    if (searchParams.has("access_token") && searchParams.get("type") === "recovery") {
-      
-      sessionStorage.setItem("reset_access_token", searchParams.get("access_token"));
-      sessionStorage.setItem("reset_refresh_token", searchParams.get("refresh_token"));
-      
+
+    if (
+      searchParams.has("access_token") &&
+      searchParams.get("type") === "recovery"
+    ) {
+      sessionStorage.setItem(
+        "reset_access_token",
+        searchParams.get("access_token")
+      );
+
+      sessionStorage.setItem(
+        "reset_refresh_token",
+        searchParams.get("refresh_token")
+      );
+
       window.location.replace("/#/update-password");
-      return null; 
+      return null;
     }
   }
 
   return (
     <Router>
       <Routes>
-        
         {/* AUTH */}
-        <Route path="/login" element={session ? <Navigate to="/" replace /> : <PublicLayout><Login /></PublicLayout>} />
-        <Route path="/register" element={session ? <Navigate to="/" replace /> : <PublicLayout><Register /></PublicLayout>} />
-        <Route path="/forgot-password" element={session ? <Navigate to="/" replace /> : <PublicLayout><ForgotPassword /></PublicLayout>} />
+        <Route
+          path="/login"
+          element={
+            session ? (
+              <Navigate to="/" replace />
+            ) : (
+              <PublicLayout>
+                <Login />
+              </PublicLayout>
+            )
+          }
+        />
+
+        <Route
+          path="/register"
+          element={
+            session ? (
+              <Navigate to="/" replace />
+            ) : (
+              <PublicLayout>
+                <Register />
+              </PublicLayout>
+            )
+          }
+        />
+
+        <Route
+          path="/forgot-password"
+          element={
+            session ? (
+              <Navigate to="/" replace />
+            ) : (
+              <PublicLayout>
+                <ForgotPassword />
+              </PublicLayout>
+            )
+          }
+        />
+
         <Route path="/update-password" element={<UpdatePassword />} />
 
         {/* ADMIN */}
         <Route path="/admin/login" element={<AdminLogin />} />
-        <Route path="/admin/*" element={session ? <AdminLayout /> : <Navigate to="/admin/login" replace />}>
+
+        <Route
+          path="/admin/*"
+          element={
+            session ? (
+              <AdminLayout />
+            ) : (
+              <Navigate to="/admin/login" replace />
+            )
+          }
+        >
           <Route index element={<AdminDashboard />} />
           <Route path="users" element={<AdminUsers />} />
           <Route path="landlords" element={<AdminLandlords />} />
           <Route path="properties" element={<AdminProperties />} />
           <Route path="movers" element={<AdminMovers />} />
-          <Route path="payments" element={<AdminPayments />} /> {/* <-- NEW ROUTE */}
+          <Route path="payments" element={<AdminPayments />} />
           <Route path="settings" element={<AdminSettings />} />
         </Route>
 
         {/* USER */}
-        <Route path="/user/dashboard" element={session ? <UserDashboard /> : <Navigate to="/login" replace />} />
+        <Route
+          path="/user/dashboard"
+          element={
+            session ? (
+              <UserDashboard />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
         {/* ── SHORT-STAY ADDITION (2 of 2): guest's own bookings, protected ── */}
-        <Route path="/my-stay-bookings" element={session ? <MyShortStayBookings /> : <Navigate to="/login" replace />} />
-        <Route path="/subscribe" element={session ? <SubscriptionPage /> : <Navigate to="/login" replace />} />
+        <Route
+          path="/my-stay-bookings"
+          element={
+            session ? (
+              <MyShortStayBookings />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
+        <Route
+          path="/subscribe"
+          element={
+            session ? (
+              <SubscriptionPage />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
 
         {/* NEW: PUBLIC JOIN LINK (No Header/Footer) */}
         <Route path="/join/:code" element={<JoinPage />} />
 
         {/* LANDLORD MANAGEMENT SUITE */}
-        <Route path="/landlord/*" element={session ? <LandlordDashboard /> : <Navigate to="/login" replace />}>
+        <Route
+          path="/landlord/*"
+          element={
+            session ? (
+              <LandlordDashboard />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        >
           <Route index element={<LandlordHome />} />
           <Route path="rentals" element={<LandlordRentals />} />
           <Route path="payments" element={<LandlordPayments />} />
           <Route path="maintenance" element={<LandlordMaintenance />} />
           <Route path="properties" element={<LandlordProperties />} />
           <Route path="requests" element={<LandlordRequests />} />
-          <Route path="messages" element={<LandlordHome status="coming_soon" />} />
-          <Route path="settings" element={<LandlordHome status="coming_soon" />} />
+          <Route
+            path="messages"
+            element={<LandlordHome status="coming_soon" />}
+          />
+          <Route
+            path="settings"
+            element={<LandlordHome status="coming_soon" />}
+          />
         </Route>
 
         {/* MOVER */}
-        <Route path="/mover/*" element={session ? <MoverDashboard /> : <Navigate to="/login" replace />}>
+        <Route
+          path="/mover/*"
+          element={
+            session ? (
+              <MoverDashboard />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        >
           <Route index element={<MoverHome />} />
           <Route path="jobs" element={<MoverJobs />} />
         </Route>
 
-        {/* PUBLIC */}
-        <Route path="/" element={<PublicLayout><Home /></PublicLayout>} />
-        <Route path="/find-houses" element={<PublicLayout><FindHouses /></PublicLayout>} />
-        {/* ── SHORT-STAY ADDITION: public marketplace page (Header/Footer) ── */}
-        <Route path="/short-stays" element={<PublicLayout><ShortStays /></PublicLayout>} />
-        <Route path="/movers" element={<PublicLayout><MoversPage /></PublicLayout>} />
-        
-        <Route path="*" element={<Navigate to="/" replace />} />
+        {/* TEMPORARY SANITY IMAGE MIGRATION */}
+        <Route
+          path="/sanity-migration"
+          element={<SanityMigrationUploader />}
+        />
 
+        {/* PUBLIC */}
+        <Route
+          path="/"
+          element={
+            <PublicLayout>
+              <Home />
+            </PublicLayout>
+          }
+        />
+
+        <Route
+          path="/find-houses"
+          element={
+            <PublicLayout>
+              <FindHouses />
+            </PublicLayout>
+          }
+        />
+
+        {/* ── SHORT-STAY ADDITION: public marketplace page (Header/Footer) ── */}
+        <Route
+          path="/short-stays"
+          element={
+            <PublicLayout>
+              <ShortStays />
+            </PublicLayout>
+          }
+        />
+
+        <Route
+          path="/movers"
+          element={
+            <PublicLayout>
+              <MoversPage />
+            </PublicLayout>
+          }
+        />
+
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
   );
