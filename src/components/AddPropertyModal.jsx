@@ -1,101 +1,26 @@
-/* eslint-disable no-unused-vars */
-// src/components/AddPropertyModal.jsx
-import React, { useState, useEffect } from "react";
-import { supabase } from "../lib/supabaseClient";
-import { counties, constituencies } from "../data/locations";
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabaseClient';
 
 // --- Sanity Configuration ---
 const SANITY_PROJECT_ID = import.meta.env.VITE_SANITY_PROJECT_ID;
-const SANITY_DATASET = import.meta.env.VITE_SANITY_DATASET || "production";
-const SANITY_TOKEN = import.meta.env.VITE_SANITY_TOKEN || "";
+const SANITY_DATASET = import.meta.env.VITE_SANITY_DATASET || 'production';
+const SANITY_TOKEN = import.meta.env.VITE_SANITY_TOKEN || '';
 
-// --- Components ---
-
-const Input = ({ label, name, value, onChange, type = "text", placeholder, required, color = "blue" }) => {
-  const colorClasses = {
-    blue: "border-blue-200 focus:border-blue-500 focus:ring-blue-100",
-    green: "border-emerald-200 focus:border-emerald-500 focus:ring-emerald-100",
-    gray: "border-gray-200 focus:border-gray-500 focus:ring-gray-100",
-    purple: "border-purple-200 focus:border-purple-500 focus:ring-purple-100",
-  }[color];
-
-  return (
-    <div>
-      <label className="block text-sm font-semibold text-gray-700 mb-1.5">{label}</label>
-      <input
-        name={name}
-        type={type}
-        value={value}
-        onChange={onChange}
-        placeholder={placeholder}
-        className={`w-full bg-white border-2 ${colorClasses} rounded-xl p-3.5 text-gray-800 transition-all outline-none focus:ring-2`}
-        required={required}
-      />
-    </div>
-  );
-};
-
-const Select = ({ label, name, value, onChange, options, color = "blue", disabled = false, placeholder = "Select..." }) => {
-  const colorClasses = {
-    blue: "border-blue-200 focus:border-blue-500 focus:ring-blue-100",
-    green: "border-emerald-200 focus:border-emerald-500 focus:ring-emerald-100",
-    gray: "border-gray-200 focus:border-gray-500 focus:ring-gray-100",
-    purple: "border-purple-200 focus:border-purple-500 focus:ring-purple-100",
-  }[color];
-
-  return (
-    <div>
-      <label className="block text-sm font-semibold text-gray-700 mb-1.5">{label}</label>
-      <select
-        name={name}
-        value={value}
-        onChange={onChange}
-        disabled={disabled}
-        className={`w-full bg-white border-2 ${colorClasses} rounded-xl p-3.5 text-gray-800 transition-all outline-none focus:ring-2 appearance-none cursor-pointer ${disabled ? 'bg-gray-50 text-gray-400 cursor-not-allowed' : ''}`}
-      >
-        <option value="">{placeholder}</option>
-        {options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-      </select>
-    </div>
-  );
-};
-
-// --- Main Modal ---
-
-export default function AddPropertyModal({ isOpen, onClose }) {
-  const [loading, setLoading] = useState(false);
-  const [step, setStep] = useState(1);
-  const [gpsStatus, setGpsStatus] = useState("idle");
-  
+export default function AddAirbnbModal({ isOpen, onClose, onSuccess }) {
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
   const [imageFiles, setImageFiles] = useState([]);
 
-  // Simplified State for Units
-  const [enableUnits, setEnableUnits] = useState(false);
-  const [unitCount, setUnitCount] = useState(1);
-
-  const [formData, setFormData] = useState({
-    title: "", type: "Apartment", description: "",
-    price: "", 
-    county: "", constituency: "", town: "", landmark: "", location: "",
-    bedrooms: "0", bathrooms: "0", size: "",
-    parking: "None", security_deposit: "", availability_date: "",
-    issues: "", solutions: "",
-    landlord_name: "", landlord_phone: "", landlord_email: "",
-    latitude: null, longitude: null,
-    /* ── SHORT-STAY ADDITION (1 of 4): new form fields ── */
-    listing_type: "long_term",
-    price_per_night: "",
+  const [form, setForm] = useState({
+    name: '', location: '', county: '', constituency: '',
+    description: '', house_rules: '',
+    max_guests: 1, bedrooms: 1, beds: 1, bathrooms: 1,
+    amenities: '',
+    price_per_night: '', cleaning_fee: 0, min_nights: 1,
+    check_in_time: '2:00 PM', check_out_time: '10:00 AM',
   });
 
-  const [constituencyOptions, setConstituencyOptions] = useState([]);
-  const [amenities, setAmenities] = useState([]);
-
-  const amenityOptions = [
-    "Pet Friendly", "Balcony", "Swimming Pool", "Gym Access", 
-    "24/7 Security", "WiFi Included", "Water 24/7", "Furnished",
-    "Parking", "Backup Generator"
-  ];
-
+  // Cleanup preview URLs on unmount
   useEffect(() => {
     return () => {
       imageFiles.forEach(img => {
@@ -104,82 +29,12 @@ export default function AddPropertyModal({ isOpen, onClose }) {
     };
   }, [imageFiles]);
 
-  // --- Handlers ---
-
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setForm(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleCountyChange = (e) => {
-    const selectedCounty = e.target.value;
-    const constits = selectedCounty ? constituencies[selectedCounty] : [];
-    
-    setConstituencyOptions(constits);
-    
-    setFormData(prev => ({
-      ...prev,
-      county: selectedCounty,
-      constituency: "", 
-      town: "", 
-      location: selectedCounty
-    }));
-  };
-
-  const handleConstituencyChange = (e) => {
-    const selectedConstituency = e.target.value;
-    
-    setFormData(prev => ({
-      ...prev,
-      constituency: selectedConstituency,
-      location: `${selectedConstituency}, ${prev.county}`
-    }));
-  };
-
-  const handleTownChange = (e) => {
-    const town = e.target.value;
-    setFormData(prev => ({
-      ...prev,
-      town: town,
-      location: `${town}, ${prev.constituency}, ${prev.county}`
-    }));
-  };
-
-  const handleLandmarkChange = (e) => {
-    const landmark = e.target.value;
-    setFormData(prev => ({
-      ...prev,
-      landmark: landmark,
-      location: `${prev.town ? prev.town + ', ' : ''}${prev.constituency}, ${prev.county}${landmark ? ' (Near ' + landmark + ')' : ''}`
-    }));
-  };
-
-  const toggleAmenity = (amenity) => {
-    if (amenities.includes(amenity)) {
-      setAmenities(amenities.filter((a) => a !== amenity));
-    } else {
-      setAmenities([...amenities, amenity]);
-    }
-  };
-
-  const handleGetLocation = () => {
-    if (!navigator.geolocation) return alert("Geolocation not supported");
-    setGpsStatus("loading");
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setFormData(prev => ({
-          ...prev,
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude
-        }));
-        setGpsStatus("success");
-      },
-      () => {
-        setGpsStatus("error");
-        alert("Unable to retrieve location.");
-      }
-    );
-  };
-
+  // --- Image Handlers ---
   const handleImageChange = (e) => {
     const files = Array.from(e.target.files);
     if (!files.length) return;
@@ -188,13 +43,15 @@ export default function AddPropertyModal({ isOpen, onClose }) {
     const availableSlots = 10 - currentCount;
 
     if (files.length > availableSlots) {
-      alert(`Limit 10 images. You can add ${availableSlots} more.`);
+      setError(`Limit 10 images. You can add ${availableSlots} more.`);
+      return;
     }
+    setError(null);
 
     const filesToAdd = files.slice(0, availableSlots);
     const newFilesWithPreview = filesToAdd.map(file => ({
       file,
-      preview: URL.createObjectURL(file)
+      preview: URL.createObjectURL(file),
     }));
 
     setImageFiles(prev => [...prev, ...newFilesWithPreview]);
@@ -210,11 +67,7 @@ export default function AddPropertyModal({ isOpen, onClose }) {
     });
   };
 
-  const nextStep = () => setStep(prev => prev + 1);
-  const prevStep = () => setStep(prev => prev - 1);
-
-  // --- SUBMISSION ---
-
+  // --- Sanity Upload ---
   const uploadToSanity = async (file) => {
     const url = `https://${SANITY_PROJECT_ID}.api.sanity.io/v2021-06-07/assets/images/${SANITY_DATASET}`;
     const response = await fetch(url, {
@@ -222,414 +75,397 @@ export default function AddPropertyModal({ isOpen, onClose }) {
       headers: {
         'Accept': 'application/json',
         'Authorization': `Bearer ${SANITY_TOKEN}`,
-        'Content-Type': file.type
+        'Content-Type': file.type,
       },
-      body: file
+      body: file,
     });
-    if (!response.ok) throw new Error("Upload failed");
+    if (!response.ok) throw new Error('Image upload failed');
     const result = await response.json();
     return (result.document || result).url;
   };
 
-  const handleSubmit = async () => {
-    if (imageFiles.length === 0) return alert("Please upload at least one image");
+  // --- Submit ---
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    setError(null);
 
-    /* ── SHORT-STAY ADDITION (2 of 4): validate nightly price ── */
-    if (formData.listing_type !== "long_term" && !formData.price_per_night) {
-      return alert("Please enter a Price Per Night for short-stay listings.");
-    }
-    
-    setLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
+      if (imageFiles.length === 0) {
+        throw new Error('Please upload at least one image.');
+      }
 
-      // 1. Upload Images
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('You must be logged in.');
+
+      // 1. Upload all images to Sanity
       const uploadPromises = imageFiles.map((imgObj) => uploadToSanity(imgObj.file));
       const imageUrls = await Promise.all(uploadPromises);
 
-      // 2. Prepare Property Data
-      const propertyData = {
-        ...formData,
-        landlord_id: user.id,
-        price: parseFloat(formData.price) || 0,
-        security_deposit: parseFloat(formData.security_deposit || 0),
-        bedrooms: parseInt(formData.bedrooms),
-        bathrooms: parseInt(formData.bathrooms),
-        image_url: imageUrls[0], 
-        images: JSON.stringify(imageUrls), 
-        amenities: amenities,
-        status: "active",
-        latitude: formData.latitude ? parseFloat(formData.latitude) : null,
-        longitude: formData.longitude ? parseFloat(formData.longitude) : null,
-        /* ── SHORT-STAY ADDITION (3 of 4): persist new fields ── */
-        listing_type: formData.listing_type || "long_term",
-        ...(formData.listing_type !== "long_term" && formData.price_per_night
-          ? { price_per_night: parseFloat(formData.price_per_night) } : {}),
+      // 2. Format amenities from comma-separated string
+      const amenitiesArray = form.amenities
+        ? form.amenities.split(',').map(item => item.trim()).filter(Boolean)
+        : [];
+
+      // 3. Build payload
+      const payload = {
+        host_id: user.id,
+        name: form.name,
+        location: form.location,
+        county: form.county,
+        constituency: form.constituency,
+        description: form.description,
+        house_rules: form.house_rules,
+        max_guests: parseInt(form.max_guests) || 1,
+        bedrooms: parseInt(form.bedrooms) || 1,
+        beds: parseInt(form.beds) || 1,
+        bathrooms: parseInt(form.bathrooms) || 1,
+        amenities: amenitiesArray,
+        price_per_night: parseFloat(form.price_per_night) || 0,
+        cleaning_fee: parseFloat(form.cleaning_fee) || 0,
+        min_nights: parseInt(form.min_nights) || 1,
+        check_in_time: form.check_in_time,
+        check_out_time: form.check_out_time,
+        image_url: imageUrls[0],          // Main image (first)
+        photos: imageUrls,                // All images as array
+        status: 'active',
       };
 
-      // 3. Insert Property
-      const { data: newProperty, error: insertError } = await supabase
-        .from("properties")
-        .insert(propertyData)
-        .select()
-        .single();
-
+      const { error: insertError } = await supabase.from('airbnb_listings').insert(payload);
       if (insertError) throw insertError;
 
-      // 4. Insert Units (if enabled) - AUTO-SETTING RENT
-      if (enableUnits && unitCount > 0) {
-        const unitsToInsert = [];
-        for (let i = 1; i <= unitCount; i++) {
-          unitsToInsert.push({
-            property_id: newProperty.id,
-            unit_name: `Unit ${i}`,
-            status: 'vacant',
-            monthly_rent: propertyData.price
-          });
-        }
-
-        const { error: unitError } = await supabase
-          .from('units')
-          .insert(unitsToInsert);
-        
-        if (unitError) console.error("Failed to save units:", unitError.message);
-      }
-
-      onClose();
-
+      onSuccess();
     } catch (err) {
-      console.error("Error:", err);
-      alert("Failed to create property: " + err.message);
+      setError(err.message);
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
   if (!isOpen) return null;
 
-  const renderStepContent = () => {
-    switch(step) {
-      case 1: 
-        return (
-          <div className="space-y-5 animate-fade-in">
-            <h3 className="text-xl font-bold text-gray-800 mb-2">Basics</h3>
-            <Input label="Property Title" name="title" value={formData.title} onChange={handleChange} placeholder="e.g. Modern Studio" required />
-            <Select label="Property Type" name="type" value={formData.type} onChange={handleChange} options={["Apartment", "House", "Studio", "Bedsitter", "Single Room"]} />
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5">Description</label>
-              <textarea name="description" value={formData.description} onChange={handleChange} rows="3" className="w-full bg-white border-2 border-blue-200 focus:border-blue-500 focus:ring-blue-100 rounded-xl p-3.5 text-gray-800 transition-all outline-none focus:ring-2 resize-none" placeholder="Describe features..."></textarea>
-            </div>
-          </div>
-        );
-      
-      case 2: 
-        return (
-          <div className="space-y-5 animate-fade-in">
-            <h3 className="text-xl font-bold text-gray-800 mb-2">Location Details</h3>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-              <Select 
-                label="County" 
-                name="county" 
-                value={formData.county} 
-                onChange={handleCountyChange} 
-                options={counties} 
-                color="green" 
-                placeholder="Select County"
-              />
-              
-              <Select 
-                label="Constituency" 
-                name="constituency" 
-                value={formData.constituency} 
-                onChange={handleConstituencyChange} 
-                options={constituencyOptions} 
-                color="green" 
-                disabled={!formData.county}
-                placeholder="Select Constituency"
-              />
-            </div>
+  return (
+    <div
+      className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 overflow-y-auto"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="p-6 border-b border-gray-100 sticky top-0 bg-white z-10">
+          <h2 className="text-xl font-bold text-gray-800">List a New Airbnb</h2>
+          <p className="text-sm text-gray-500 mt-1">
+            Fill out the details for your short-stay property.
+          </p>
+        </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                <Input 
-                    label="Town / Area" 
-                    name="town" 
-                    value={formData.town} 
-                    onChange={handleTownChange} 
-                    placeholder="e.g. Kilimani, Runda" 
-                    color="green"
+        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          {error && (
+            <div className="bg-red-50 text-red-700 p-3 rounded-lg text-sm border border-red-200">
+              {error}
+            </div>
+          )}
+
+          {/* ─── Basic Info ─── */}
+          <div className="space-y-4">
+            <h3 className="font-semibold text-gray-700 border-b pb-2">Basic Information</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Listing Name*
+                </label>
+                <input
+                  type="text"
+                  name="name"
+                  value={form.name}
+                  onChange={handleChange}
+                  required
+                  className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none"
+                  placeholder="e.g. Modern 2BR Apartment near CBD"
                 />
-                <Input 
-                    label="Landmark / Street" 
-                    name="landmark" 
-                    value={formData.landmark} 
-                    onChange={handleLandmarkChange} 
-                    placeholder="e.g. Near Yaya Centre" 
-                    color="green" 
-                />
-            </div>
-
-            <div className="p-3 bg-gray-50 rounded-lg text-sm text-gray-500 border border-dashed">
-                <span className="font-medium text-gray-700">Full Address:</span> 
-                {formData.location || 'Select location above'}
-            </div>
-
-            <div className="grid grid-cols-2 gap-5 pt-4 border-t">
-                <Input label="Size (sqft)" name="size" value={formData.size} onChange={handleChange} placeholder="1200" color="green" />
-                <Select label="Parking" name="parking" value={formData.parking} onChange={handleChange} options={["None", "Shared", "1 Dedicated", "2+"]} color="green" />
-                <Input label="Bedrooms" name="bedrooms" type="number" value={formData.bedrooms} onChange={handleChange} color="green" />
-                <Input label="Bathrooms" name="bathrooms" type="number" value={formData.bathrooms} onChange={handleChange} color="green" />
-            </div>
-            
-            <div className="pt-2">
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5">GPS Location (Optional)</label>
-              <button type="button" onClick={handleGetLocation} disabled={gpsStatus === "loading"} className={`w-full flex items-center justify-center space-x-2 py-3 px-4 rounded-xl border-2 transition-all font-medium ${gpsStatus === "success" ? "bg-green-50 border-green-400 text-green-700" : "bg-white border-gray-200 text-gray-600 hover:border-blue-400 hover:text-blue-600"}`}>
-                  {gpsStatus === "loading" ? (
-                    <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                  ) : gpsStatus === "success" ? (
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                  ) : (
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                  )}
-                  <span>{gpsStatus === "loading" ? "Capturing..." : gpsStatus === "success" ? "Location Captured" : "Use Current Location"}</span>
-              </button>
-            </div>
-
-            <div className="pt-4">
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Amenities</label>
-              <div className="flex flex-wrap gap-2">
-                {amenityOptions.map((option) => (
-                  <button type="button" key={option} onClick={() => toggleAmenity(option)} className={`px-4 py-2 rounded-full text-sm font-medium border-2 transition-all ${amenities.includes(option) ? "bg-green-50 border-green-500 text-green-700" : "bg-white border-gray-200 text-gray-500 hover:bg-gray-50"}`}>
-                    {option}
-                  </button>
-                ))}
               </div>
-            </div>
-          </div>
-        );
-
-      case 3:
-        return (
-          <div className="space-y-5 animate-fade-in">
-            <div className="flex justify-between items-center mb-2">
-              <h3 className="text-xl font-bold text-gray-800">Rental Units</h3>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input type="checkbox" checked={enableUnits} onChange={() => setEnableUnits(!enableUnits)} className="sr-only peer" />
-                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-100 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
-                <span className="ml-3 text-sm font-medium text-gray-600">Multi-Unit Property</span>
-              </label>
-            </div>
-
-            {enableUnits ? (
-              <div className="space-y-4">
-                <p className="text-sm text-gray-500">
-                  Enter the number of units. We will automatically generate unit names (e.g., Unit 1, Unit 2) and set the rent to KES {formData.price ? parseFloat(formData.price).toLocaleString() : '0'}.
-                </p>
-                
-                <Input 
-                  label="Number of Units" 
-                  name="unitCount" 
-                  type="number" 
-                  value={unitCount} 
-                  onChange={(e) => setUnitCount(parseInt(e.target.value) || 1)} 
-                  placeholder="e.g. 5" 
-                  color="purple" 
-                />
-
-                <div className="text-xs text-gray-400 bg-purple-50 p-3 rounded-lg border border-purple-100">
-                  {unitCount > 0 ? (
-                    <span>Creating: <strong>Unit 1</strong> to <strong>Unit {unitCount}</strong></span>
-                  ) : (
-                    <span>Please enter a valid number.</span>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="text-center py-8 bg-gray-50 rounded-xl border border-dashed border-gray-200">
-                <svg className="w-12 h-12 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
-                <p className="text-gray-500 text-sm">This is a single unit property (e.g. House).</p>
-                <p className="text-gray-400 text-xs mt-1">Enable toggle above if this property has multiple rental units.</p>
-              </div>
-            )}
-          </div>
-        );
-
-      case 4: 
-        return (
-          <div className="space-y-5 animate-fade-in">
-            <h3 className="text-xl font-bold text-gray-800 mb-2">Financials & Honesty</h3>
-            <div className="bg-yellow-50 p-5 rounded-xl border-2 border-yellow-100 space-y-4">
-              <h4 className="font-semibold text-yellow-800 flex items-center">
-                <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
-                Honest Disclosure
-              </h4>
-              <Input label="Known Issues" name="issues" value={formData.issues} onChange={handleChange} placeholder="e.g. Water cuts" color="gray" />
-              <Input label="Solutions/Mitigation" name="solutions" value={formData.solutions} onChange={handleChange} placeholder="e.g. Borehole available" color="gray" />
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-              {/* ── SHORT-STAY ADDITION (4 of 4a): Rent only required for long-term ── */}
-              <Input label="Rent (KES)" name="price" type="number" value={formData.price} onChange={handleChange}
-                required={formData.listing_type !== "short_stay"} />
-              <Input label="Deposit (KES)" name="security_deposit" type="number" value={formData.security_deposit} onChange={handleChange} />
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Availability</label>
-                <input name="availability_date" type="date" value={formData.availability_date} onChange={handleChange} className="w-full bg-white border-2 border-blue-200 focus:border-blue-500 focus:ring-blue-100 rounded-xl p-3.5 text-gray-800 transition-all outline-none focus:ring-2" />
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Location/Address*
+                </label>
+                <input
+                  type="text"
+                  name="location"
+                  value={form.location}
+                  onChange={handleChange}
+                  required
+                  className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none"
+                  placeholder="e.g. Quiet Street, Meru"
+                />
               </div>
-            </div>
-
-            {/* ── SHORT-STAY ADDITION (4 of 4b): new section, purely appended ── */}
-            <div className="bg-blue-50 p-5 rounded-xl border-2 border-blue-100 space-y-4">
-              <h4 className="font-semibold text-blue-900 flex items-center">
-                <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M12.316 3.486a.5.5 0 01.485.25L17.5 11.5a.5.5 0 01-.431.748H13v6a1 1 0 01-1 1H8a1 1 0 01-1-1v-6H2.93a.5.5 0 01-.43-.748l4.699-7.764a.5.5 0 01.485-.25z" clipRule="evenodd" /></svg>
-                Short-Stay Pricing (Optional)
-              </h4>
-              <p className="text-xs text-gray-500 -mt-2">
-                Also list this property for nightly bookings (Airbnb-style)? Leave as Long-Term if not.
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Listing Type</label>
-                  <select
-                    name="listing_type"
-                    value={formData.listing_type}
-                    onChange={handleChange}
-                    className="w-full bg-white border-2 border-blue-200 focus:border-blue-500 focus:ring-blue-100 rounded-xl p-3.5 text-gray-800 transition-all outline-none focus:ring-2 cursor-pointer"
-                  >
-                    <option value="long_term">Long-Term Rental (monthly)</option>
-                    <option value="short_stay">Short-Stay Only (nightly)</option>
-                    <option value="both">Both (nightly + monthly)</option>
-                  </select>
-                </div>
-                {formData.listing_type !== "long_term" && (
-                  <Input
-                    label="Price Per Night (KES)"
-                    name="price_per_night"
-                    type="number"
-                    value={formData.price_per_night}
-                    onChange={handleChange}
-                    placeholder="e.g. 1200"
-                    color="green"
-                    required={formData.listing_type !== "long_term"}
-                  />
-                )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">County</label>
+                <input
+                  type="text"
+                  name="county"
+                  value={form.county}
+                  onChange={handleChange}
+                  className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none"
+                />
               </div>
             </div>
           </div>
-        );
 
-      case 5: 
-        return (
-          <div className="space-y-5 animate-fade-in">
-            <h3 className="text-xl font-bold text-gray-800 mb-2">Media (Max 10 Images)</h3>
-            
-            <div className="grid grid-cols-3 gap-3">
+          {/* ─── Property Specs ─── */}
+          <div className="space-y-4">
+            <h3 className="font-semibold text-gray-700 border-b pb-2">Property Specs</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {[
+                { label: 'Max Guests', name: 'max_guests', min: 1 },
+                { label: 'Bedrooms', name: 'bedrooms', min: 0 },
+                { label: 'Beds', name: 'beds', min: 0 },
+                { label: 'Bathrooms', name: 'bathrooms', min: 0 },
+              ].map(({ label, name, min }) => (
+                <div key={name}>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {label}
+                  </label>
+                  <input
+                    type="number"
+                    name={name}
+                    value={form[name]}
+                    onChange={handleChange}
+                    min={min}
+                    className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                </div>
+              ))}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Amenities{' '}
+                <span className="text-gray-400 font-normal">(comma separated)</span>
+              </label>
+              <input
+                type="text"
+                name="amenities"
+                value={form.amenities}
+                onChange={handleChange}
+                className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none"
+                placeholder="e.g. WiFi, Free Parking, Kitchen, Pool"
+              />
+            </div>
+          </div>
+
+          {/* ─── Pricing & Timing ─── */}
+          <div className="space-y-4">
+            <h3 className="font-semibold text-gray-700 border-b pb-2">Pricing & Timing</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Price Per Night (KES)*
+                </label>
+                <input
+                  type="number"
+                  name="price_per_night"
+                  value={form.price_per_night}
+                  onChange={handleChange}
+                  required
+                  className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Cleaning Fee (KES)
+                </label>
+                <input
+                  type="number"
+                  name="cleaning_fee"
+                  value={form.cleaning_fee}
+                  onChange={handleChange}
+                  className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Minimum Nights
+                </label>
+                <input
+                  type="number"
+                  name="min_nights"
+                  value={form.min_nights}
+                  onChange={handleChange}
+                  min="1"
+                  className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Check-in Time
+                </label>
+                <input
+                  type="text"
+                  name="check_in_time"
+                  value={form.check_in_time}
+                  onChange={handleChange}
+                  className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Check-out Time
+                </label>
+                <input
+                  type="text"
+                  name="check_out_time"
+                  value={form.check_out_time}
+                  onChange={handleChange}
+                  className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* ─── Photos (File Upload) ─── */}
+          <div className="space-y-4">
+            <h3 className="font-semibold text-gray-700 border-b pb-2">
+              Photos <span className="text-gray-400 font-normal text-sm">(Max 10)</span>
+            </h3>
+
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+              {/* Previews */}
               {imageFiles.map((img, index) => (
                 <div key={index} className="relative aspect-square group">
                   <div className="w-full h-full border-2 border-blue-300 rounded-xl p-1 bg-blue-50/50 flex items-center justify-center overflow-hidden relative">
-                    <img src={img.preview} alt={`Preview ${index}`} className="w-full h-full object-cover rounded-lg" />
-                    <button 
+                    <img
+                      src={img.preview}
+                      alt={`Preview ${index + 1}`}
+                      className="w-full h-full object-cover rounded-lg"
+                    />
+                    {/* Remove button */}
+                    <button
                       type="button"
                       onClick={() => removeImage(index)}
                       className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-md z-20"
                     >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M6 18L18 6M6 6l12 12"
+                        />
+                      </svg>
                     </button>
+                    {/* Main badge on first image */}
+                    {index === 0 && (
+                      <span className="absolute bottom-1 left-1 bg-blue-600 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full z-20">
+                        Main
+                      </span>
+                    )}
                   </div>
                 </div>
               ))}
 
+              {/* Add Photos placeholder */}
               {imageFiles.length < 10 && (
                 <div className="relative aspect-square group">
                   <div className="w-full h-full border-2 border-dashed border-blue-300 rounded-xl p-1 hover:border-blue-500 transition-colors bg-blue-50/50 flex items-center justify-center overflow-hidden relative cursor-pointer">
                     <div className="text-center text-blue-400 pointer-events-none">
-                      <svg className="w-6 h-6 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                      <svg
+                        className="w-6 h-6 mx-auto mb-1"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 4v16m8-8H4"
+                        />
+                      </svg>
                       <p className="text-xs font-medium">Add Photos</p>
-                      <p className="text-[10px] text-gray-400">{10 - imageFiles.length} left</p>
+                      <p className="text-[10px] text-gray-400">
+                        {10 - imageFiles.length} left
+                      </p>
                     </div>
-                    <input 
-                      type="file" 
-                      accept="image/*" 
+                    <input
+                      type="file"
+                      accept="image/*"
                       multiple
-                      onChange={handleImageChange} 
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
+                      onChange={handleImageChange}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                     />
                   </div>
                 </div>
               )}
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 pt-4 border-t border-gray-100 mt-6">
-              <Input label="Your Name" name="landlord_name" value={formData.landlord_name} onChange={handleChange} required color="gray" />
-              <Input label="Phone Number" name="landlord_phone" type="tel" value={formData.landlord_phone} onChange={handleChange} required color="gray" />
-              <Input label="Email" name="landlord_email" type="email" value={formData.landlord_email} onChange={handleChange} color="gray" />
+            {imageFiles.length === 0 && (
+              <p className="text-sm text-red-500 -mt-1">
+                At least one image is required.
+              </p>
+            )}
+          </div>
+
+          {/* ─── Details ─── */}
+          <div className="space-y-4">
+            <h3 className="font-semibold text-gray-700 border-b pb-2">Details</h3>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Description
+              </label>
+              <textarea
+                name="description"
+                rows="3"
+                value={form.description}
+                onChange={handleChange}
+                className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none"
+                placeholder="Describe the space, neighborhood, and unique features..."
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                House Rules
+              </label>
+              <textarea
+                name="house_rules"
+                rows="2"
+                value={form.house_rules}
+                onChange={handleChange}
+                className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none"
+                placeholder="No smoking, No pets, Quiet hours after 10 PM..."
+              />
             </div>
           </div>
-        );
-    }
-  };
 
-  return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl relative flex flex-col max-h-[90vh] animate-scale-in">
-        
-        <div className="p-6 bg-gradient-to-r from-blue-900 to-blue-800 rounded-t-3xl text-white">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold">List Property</h2>
-            <button onClick={onClose} className="text-white/70 hover:text-white p-1 rounded-full hover:bg-white/10 transition-colors">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          {/* ─── Actions ─── */}
+          <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-6 py-2.5 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+            >
+              Cancel
             </button>
-          </div>
-          <div className="flex items-center justify-between relative px-4">
-             <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-white/20 -translate-y-1/2"></div>
-             {[1, 2, 3, 4, 5].map((s) => (
-               <div key={s} className="relative z-10 flex flex-col items-center">
-                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-300 ${step >= s ? 'bg-emerald-500 text-white' : 'bg-white/20 text-white/50'}`}>
-                   {step > s ? <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg> : s}
-                 </div>
-               </div>
-             ))}
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-6 sm:p-8">
-          {renderStepContent()}
-        </div>
-
-        <div className="p-6 bg-gray-50 border-t border-gray-100 rounded-b-3xl flex justify-between items-center">
-          {step > 1 ? (
-            <button type="button" onClick={prevStep} className="flex items-center space-x-2 text-gray-600 hover:text-blue-600 font-semibold transition-colors px-4 py-2">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-              <span>Back</span>
-            </button>
-          ) : <div></div>}
-
-          {step < 5 ? (
-            <button type="button" onClick={nextStep} className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-xl shadow-md hover:shadow-lg transition-all">
-              <span>Continue</span>
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-            </button>
-          ) : (
-            <button onClick={handleSubmit} disabled={loading} className="flex items-center space-x-2 bg-gradient-to-r from-blue-600 to-emerald-500 text-white font-bold py-3 px-8 rounded-xl shadow-md hover:shadow-lg transition-all disabled:opacity-50">
-              {loading ? (
-                <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-              ) : (
-                <>
-                  <span>Post Property</span>
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                </>
+            <button
+              type="submit"
+              disabled={saving}
+              className="px-6 py-2.5 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+            >
+              {saving && (
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               )}
+              {saving ? 'Saving...' : 'Publish Listing'}
             </button>
-          )}
-        </div>
+          </div>
+        </form>
       </div>
-      
-      <style>{`
-        @keyframes scale-in { 0% { transform: scale(0.95); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
-        @keyframes fade-in { 0% { opacity: 0; transform: translateX(10px); } 100% { opacity: 1; transform: translateX(0); } }
-        .animate-scale-in { animation: scale-in 0.2s ease-out forwards; }
-        .animate-fade-in { animation: fade-in 0.3s ease-out forwards; }
-      `}</style>
     </div>
   );
 }
