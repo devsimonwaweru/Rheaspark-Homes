@@ -98,8 +98,8 @@ export default function Register() {
       if (authError) throw authError;
 
       // ❌ THE MANUAL INSERTS HAVE BEEN REMOVED FROM HERE ❌
-      // The SQL Trigger you ran in Supabase automatically creates the 
-      // record in 'users', 'landlords', or 'movers' using the options.data above.
+      // ⚠️ IMPORTANT: Ensure your Supabase "handle_new_user" trigger function 
+      // has been updated to check for `role = 'host'` and insert into `airbnb_hosts`!
 
       // 2. Trigger OTP Email
       await callEdgeFunction('send');
@@ -142,8 +142,10 @@ export default function Register() {
       const { error: loginError } = await supabase.auth.signInWithPassword({ email, password });
       if (loginError) throw loginError;
 
+      // Route to the correct dashboard based on role
       if (role === "landlord") navigate("/subscription");
-      else if (role === "mover") navigate("/mover/dashboard");
+      else if (role === "host") navigate("/host");
+      else if (role === "mover") navigate("/mover");
       else navigate("/user/dashboard");
 
     } catch (err) {
@@ -169,7 +171,7 @@ export default function Register() {
         <div className="absolute bottom-20 left-20 w-72 h-72 bg-blue-400 rounded-full mix-blend-multiply filter blur-3xl opacity-30 transition-transform duration-300 ease-out" style={{ transform: `translate(${mousePos.x * 0.04}px, ${mousePos.y * 0.04}px)` }}></div>
         <div className="relative z-10 transition-transform duration-300 ease-out" style={{ transform: `translate(${mousePos.x * 0.01}px, ${mousePos.y * 0.01}px)` }}>
           <h1 className="text-5xl font-bold mb-6 leading-tight">Join Rheaspark<br /> Today</h1>
-          <p className="text-lg text-emerald-100 mb-8 max-w-md">Create an account to list your properties, offer moving services, or find your perfect home.</p>
+          <p className="text-lg text-emerald-100 mb-8 max-w-md">Create an account to list your properties, offer moving services, host Airbnbs, or find your perfect home.</p>
         </div>
       </div>
 
@@ -200,7 +202,22 @@ export default function Register() {
               <div><label className="block text-sm font-medium text-gray-700 mb-2">Active Phone Number</label><input type="tel" placeholder="e.g. +2547XXXXXXXX" className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition shadow-sm" value={phone} onChange={(e) => setPhone(e.target.value)} required /></div>
               <div><label className="block text-sm font-medium text-gray-700 mb-2">Email Address</label><input type="email" placeholder="Enter your email" className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition shadow-sm" value={email} onChange={(e) => setEmail(e.target.value)} required /></div>
               <div><label className="block text-sm font-medium text-gray-700 mb-2">Password</label><div className="relative"><input type={showPassword ? "text" : "password"} placeholder="Create a password" className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition shadow-sm pr-12" value={password} onChange={(e) => setPassword(e.target.value)} required /><button type="button" className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600" onClick={() => setShowPassword(!showPassword)}>{showPassword ? "Hide" : "Show"}</button></div></div>
-              <div><label className="block text-sm font-medium text-gray-700 mb-2">Register as</label><select value={role} onChange={(e) => setRole(e.target.value)} className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition shadow-sm bg-white"><option value="user">User (Tenant)</option><option value="landlord">Landlord</option><option value="mover">Mover</option></select></div>
+              
+              {/* UPDATED ROLE SELECT */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Register as</label>
+                <select 
+                  value={role} 
+                  onChange={(e) => setRole(e.target.value)} 
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition shadow-sm bg-white"
+                >
+                  <option value="user">User (Tenant)</option>
+                  <option value="landlord">Landlord (Long-term Rentals)</option>
+                  <option value="host">Host (Airbnb / Short-stays)</option>
+                  <option value="mover">Mover (Moving Services)</option>
+                </select>
+              </div>
+
               <button type="submit" className="w-full text-white p-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 bg-gradient-to-r from-blue-600 to-emerald-500" disabled={loading}>{loading ? "Creating Account..." : "Create Account"}</button>
             </form>
           )}

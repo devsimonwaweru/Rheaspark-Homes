@@ -143,9 +143,9 @@ export default function Header() {
                 <span className="absolute bottom-0 left-0 w-0 h-[2px] bg-gradient-to-r from-[#2FA4E7] to-[#3CB371] rounded-full transition-all duration-300 group-hover:w-full"></span>
               </Link>
 
-              {/* ── SHORT-STAY ADDITION (1 of 2): Desktop nav ── */}
-              <Link to="/short-stays" className="relative font-medium text-white/90 hover:text-white transition-colors duration-300 py-2 group">
-                Short Stays
+              {/* ── AIRBNB ADDITION (1 of 2): Desktop nav ── */}
+              <Link to={session ? "/find-airbnb" : "/login"} className="relative font-medium text-white/90 hover:text-white transition-colors duration-300 py-2 group">
+                Find Airbnb
                 <span className="absolute bottom-0 left-0 w-0 h-[2px] bg-gradient-to-r from-[#2FA4E7] to-[#3CB371] rounded-full transition-all duration-300 group-hover:w-full"></span>
               </Link>
 
@@ -312,9 +312,13 @@ export default function Header() {
               Find Houses
             </Link>
 
-            {/* ── SHORT-STAY ADDITION (2 of 2): Mobile menu ── */}
-            <Link to="/short-stays" onClick={toggleMobileMenu} className="block py-3 px-4 rounded-lg font-medium hover:bg-blue-50 hover:text-[#2FA4E7] transition-colors">
-              Short Stays
+            {/* ── AIRBNB ADDITION (2 of 2): Mobile menu ── */}
+            <Link 
+              to={session ? "/find-airbnb" : "/login"} 
+              onClick={toggleMobileMenu} 
+              className="block py-3 px-4 rounded-lg font-medium hover:bg-blue-50 hover:text-[#2FA4E7] transition-colors"
+            >
+              Find Airbnb
             </Link>
 
             <Link to="/movers" onClick={toggleMobileMenu} className="block py-3 px-4 rounded-lg font-medium hover:bg-blue-50 hover:text-[#2FA4E7] transition-colors">

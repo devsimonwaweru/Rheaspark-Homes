@@ -9,23 +9,32 @@ import 'swiper/css/navigation';
 
 import GradientButton from '../components/GradientButton';
 import PropertyCard from '../components/PropertyCard';
+import AirbnbCard from '../components/AirbnbCard'; // NEW: Import AirbnbCard
 import PropertyDetailsModal from '../components/PropertyDetailsModal'; 
 import { supabase } from '../lib/supabaseClient'; 
 
 export default function Home() {
   const [heroSlides, setHeroSlides] = useState([]);
   const [loadingSlides, setLoadingSlides] = useState(true);
+  
+  // Houses State
   const [featuredProperties, setFeaturedProperties] = useState([]);
   const [loadingProperties, setLoadingProperties] = useState(true);
+  
+  // Airbnb State
+  const [featuredAirbnbs, setFeaturedAirbnbs] = useState([]);
+  const [loadingAirbnbs, setLoadingAirbnbs] = useState(true);
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState(null);
   
-  // New state for auth status
+  // Auth status state
   const [authStatus, setAuthStatus] = useState('checking'); // 'checking', 'guest', 'pro', 'user'
 
   useEffect(() => {
     fetchHeroSlides();
     fetchFeaturedProperties();
+    fetchFeaturedAirbnbs();
     checkAuth();
   }, []);
 
@@ -68,10 +77,19 @@ export default function Home() {
 
   const fetchFeaturedProperties = async () => {
     try {
-      const { data, error } = await supabase.from('properties').select('*').eq('featured', 'true').eq('status', 'active').order('created_at', { ascending: false }).limit(6);
+      const { data, error } = await supabase.from('properties').select('*').eq('featured', 'true').eq('status', 'active').order('created_at', { ascending: false }).limit(3);
       if (error) throw error;
       if (data) setFeaturedProperties(data);
     } catch (error) { console.error('Error fetching featured properties:', error.message); } finally { setLoadingProperties(false); }
+  };
+
+  const fetchFeaturedAirbnbs = async () => {
+    try {
+      // Queries the new airbnb_listings table proposed in the architecture
+      const { data, error } = await supabase.from('airbnb_listings').select('*').eq('featured', 'true').eq('status', 'active').order('created_at', { ascending: false }).limit(3);
+      if (error) throw error;
+      if (data) setFeaturedAirbnbs(data);
+    } catch (error) { console.error('Error fetching featured airbnbs:', error.message); } finally { setLoadingAirbnbs(false); }
   };
 
   const handleViewDetails = (property) => { setSelectedProperty(property); setIsModalOpen(true); };
@@ -79,6 +97,7 @@ export default function Home() {
 
   const searchLink = authStatus === 'guest' ? '/login' : '/find-houses';
   const listingsLink = authStatus === 'guest' ? '/login' : '/find-houses';
+  const airbnbLink = authStatus === 'guest' ? '/login' : '/find-airbnb';
 
   return (
     <main>
@@ -131,25 +150,68 @@ export default function Home() {
         </div>
       </section>
 
-      {/* FEATURED PROPERTIES SECTION */}
+      {/* FEATURED HOUSES SECTION */}
       <section className="py-24 px-6 bg-gray-50">
         <div className="container mx-auto max-w-7xl">
           <div className="text-center mb-12">
-            <h2 className="text-4xl md:text-5xl font-bold mb-4 font-brand"><span className="brand-gradient">Featured</span> Properties</h2>
-            <p className="text-gray-600 text-xl max-w-3xl mx-auto">Handpicked properties by our team for you</p>
+            <h2 className="text-4xl md:text-5xl font-bold mb-4 font-brand"><span className="brand-gradient">Featured</span> Houses</h2>
+            <p className="text-gray-600 text-xl max-w-3xl mx-auto">Handpicked long-term rental properties by our team</p>
           </div>
           {loadingProperties ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">{[1, 2, 3].map((n) => (<div key={n} className="bg-white rounded-2xl h-96 animate-pulse"></div>))}</div>
           ) : featuredProperties.length === 0 ? (
-            <p className="text-center text-gray-500">No featured properties available at the moment.</p>
+            <p className="text-center text-gray-500">No featured houses available at the moment.</p>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {featuredProperties.map((property) => (<PropertyCard key={property.id} property={property} onViewDetails={handleViewDetails} />))}
             </div>
           )}
           <div className="text-center mt-12">
-            <Link to={listingsLink}><GradientButton size="lg"><i className="fas fa-th-large mr-2"></i> {authStatus === 'guest' ? 'Login to View All Listings' : 'View All Listings'}</GradientButton></Link>
+            <Link to={listingsLink}><GradientButton size="lg"><i className="fas fa-th-large mr-2"></i> {authStatus === 'guest' ? 'Login to View All Houses' : 'View All Houses'}</GradientButton></Link>
           </div>
+        </div>
+      </section>
+
+      {/* FEATURED AIRBNB SECTION */}
+      <section className="py-24 px-6 bg-white">
+        <div className="container mx-auto max-w-7xl">
+          <div className="text-center mb-12">
+            <h2 className="text-4xl md:text-5xl font-bold mb-4 font-brand"><span className="brand-gradient">Featured</span> Airbnb</h2>
+            <p className="text-gray-600 text-xl max-w-3xl mx-auto">Top short-stay accommodations for your comfort</p>
+          </div>
+          {loadingAirbnbs ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">{[1, 2, 3].map((n) => (<div key={n} className="bg-white rounded-2xl h-96 animate-pulse"></div>))}</div>
+          ) : featuredAirbnbs.length === 0 ? (
+            <p className="text-center text-gray-500">No featured Airbnbs available at the moment.</p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {featuredAirbnbs.map((airbnb) => (<AirbnbCard key={airbnb.id} airbnb={airbnb} onViewDetails={handleViewDetails} />))}
+            </div>
+          )}
+          <div className="text-center mt-12">
+            <Link to={airbnbLink}><GradientButton size="lg"><i className="fas fa-bed mr-2"></i> {authStatus === 'guest' ? 'Login to View All Airbnb' : 'View All Airbnb'}</GradientButton></Link>
+          </div>
+        </div>
+      </section>
+
+      {/* --- AIRBNB CTA SECTION (Requirement 5) --- */}
+      <section className="py-20 bg-gradient-to-br from-blue-50 via-white to-green-50 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500 opacity-5 rounded-full filter blur-3xl"></div>
+        <div className="container mx-auto px-6 relative z-10 text-center">
+            <span className="inline-block bg-white shadow-sm border border-gray-100 text-sm font-semibold text-gray-700 px-4 py-2 rounded-full mb-6">
+                Short-stays made easy
+            </span>
+            <h2 className="text-3xl md:text-5xl font-bold mb-4 leading-tight font-brand">
+                Looking for an <span className="brand-gradient">Airbnb</span>?
+            </h2>
+            <p className="text-lg text-gray-600 mb-8 max-w-2xl mx-auto leading-relaxed">
+                Find comfortable short-stay accommodation for your next trip or temporary relocation.
+            </p>
+            <Link to={airbnbLink}>
+                <GradientButton size="lg">
+                    <i className="fas fa-search mr-2"></i> {authStatus === 'guest' ? 'Login to Find Airbnb' : 'Find Airbnb'}
+                </GradientButton>
+            </Link>
         </div>
       </section>
 

@@ -1,4 +1,3 @@
-// src/pages/AdminDashboard.jsx
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import {
@@ -41,6 +40,7 @@ const AdminDashboard = () => {
         landlordsRes, 
         propertiesRes, 
         activePropsRes, 
+        airbnbsRes, // NEW: Fetch Airbnb count
         moversRes,
         paymentsRes,
         activeSubsRes
@@ -49,6 +49,7 @@ const AdminDashboard = () => {
         supabase.from('landlords').select('*', { count: 'exact', head: true }),
         supabase.from('properties').select('*', { count: 'exact', head: true }),
         supabase.from('properties').select('*', { count: 'exact', head: true }).eq('status', 'active'),
+        supabase.from('airbnb_listings').select('*', { count: 'exact', head: true }).eq('status', 'active'), // NEW
         supabase.from('movers').select('*', { count: 'exact', head: true }),
         supabase.from('payments').select('*', { count: 'exact', head: true }).eq('status', 'completed'),
         supabase.from('subscriptions').select('*', { count: 'exact', head: true }).eq('status', 'active'),
@@ -72,21 +73,31 @@ const AdminDashboard = () => {
           iconColor: 'text-[#3CB371]' 
         },
         { 
-          title: 'Total Properties', 
-          value: propertiesRes.count || 0, 
+          title: 'Active Houses', 
+          value: activePropsRes.count || 0, 
           icon: 'fa-home', 
           color: 'border-[#FF9800]', 
           bgColor: 'bg-orange-50', 
-          iconColor: 'text-[#FF9800]' 
+          iconColor: 'text-[#FF9800]',
+          subtitle: 'Long-term'
         },
         { 
-          title: 'Active Listings', 
-          value: activePropsRes.count || 0, 
-          icon: 'fa-check-circle', 
+          title: 'Active Airbnbs', 
+          value: airbnbsRes.count || 0, 
+          icon: 'fa-bed', 
+          color: 'border-teal-500', 
+          bgColor: 'bg-teal-50', 
+          iconColor: 'text-teal-500',
+          subtitle: 'Short-stays'
+        },
+        { 
+          title: 'Total Properties', 
+          value: propertiesRes.count || 0, 
+          icon: 'fa-building', 
           color: 'border-[#10B981]', 
           bgColor: 'bg-emerald-50', 
           iconColor: 'text-[#10B981]',
-          subtitle: 'Visible on site'
+          subtitle: 'All database records'
         },
         { 
           title: 'Movers', 
@@ -170,8 +181,8 @@ const AdminDashboard = () => {
         <p className="text-gray-600">Here's what's happening with your platform today.</p>
       </div>
 
-      {/* Stats Cards - Updated to handle 7 cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-4 mb-8">
+      {/* Stats Cards - Updated to 8 columns for XL screens */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8 gap-4 mb-8">
         {stats.map((stat, index) => (
           <div 
             key={index}
@@ -211,41 +222,34 @@ const AdminDashboard = () => {
           <h3 className="text-lg font-semibold text-gray-800 mb-4">Quick Actions</h3>
           <div className="space-y-3">
              <a href="/admin/properties" className="flex items-center p-3 rounded-lg bg-gray-50 hover:bg-blue-50 hover:text-blue-600 transition-colors group">
-                <div className="w-8 h-8 rounded bg-white shadow-sm flex items-center justify-center mr-3">
-                   <i className="fas fa-home text-gray-400 group-hover:text-blue-600"></i>
-                </div>
-                <span className="font-medium text-gray-700 group-hover:text-blue-600">Manage Properties</span>
+                <div className="w-8 h-8 rounded bg-white shadow-sm flex items-center justify-center mr-3"><i className="fas fa-home text-gray-400 group-hover:text-blue-600"></i></div>
+                <span className="font-medium text-gray-700 group-hover:text-blue-600">Manage Houses</span>
+             </a>
+             {/* NEW: Quick action for Airbnbs */}
+             <a href="/admin/airbnbs" className="flex items-center p-3 rounded-lg bg-gray-50 hover:bg-teal-50 hover:text-teal-600 transition-colors group">
+                <div className="w-8 h-8 rounded bg-white shadow-sm flex items-center justify-center mr-3"><i className="fas fa-bed text-gray-400 group-hover:text-teal-600"></i></div>
+                <span className="font-medium text-gray-700 group-hover:text-teal-600">Manage Airbnbs</span>
              </a>
              <a href="/admin/users" className="flex items-center p-3 rounded-lg bg-gray-50 hover:bg-blue-50 hover:text-blue-600 transition-colors group">
-                <div className="w-8 h-8 rounded bg-white shadow-sm flex items-center justify-center mr-3">
-                   <i className="fas fa-users text-gray-400 group-hover:text-blue-600"></i>
-                </div>
+                <div className="w-8 h-8 rounded bg-white shadow-sm flex items-center justify-center mr-3"><i className="fas fa-users text-gray-400 group-hover:text-blue-600"></i></div>
                 <span className="font-medium text-gray-700 group-hover:text-blue-600">Manage Users</span>
              </a>
              <a href="/admin/payments" className="flex items-center p-3 rounded-lg bg-gray-50 hover:bg-blue-50 hover:text-blue-600 transition-colors group">
-                <div className="w-8 h-8 rounded bg-white shadow-sm flex items-center justify-center mr-3">
-                   <i className="fas fa-credit-card text-gray-400 group-hover:text-blue-600"></i>
-                </div>
+                <div className="w-8 h-8 rounded bg-white shadow-sm flex items-center justify-center mr-3"><i className="fas fa-credit-card text-gray-400 group-hover:text-blue-600"></i></div>
                 <span className="font-medium text-gray-700 group-hover:text-blue-600">Payments & Subs</span>
              </a>
              <a href="/admin/landlords" className="flex items-center p-3 rounded-lg bg-gray-50 hover:bg-blue-50 hover:text-blue-600 transition-colors group">
-                <div className="w-8 h-8 rounded bg-white shadow-sm flex items-center justify-center mr-3">
-                   <i className="fas fa-user-tie text-gray-400 group-hover:text-blue-600"></i>
-                </div>
+                <div className="w-8 h-8 rounded bg-white shadow-sm flex items-center justify-center mr-3"><i className="fas fa-user-tie text-gray-400 group-hover:text-blue-600"></i></div>
                 <span className="font-medium text-gray-700 group-hover:text-blue-600">Manage Landlords</span>
              </a>
              <a href="/admin/movers" className="flex items-center p-3 rounded-lg bg-gray-50 hover:bg-blue-50 hover:text-blue-600 transition-colors group">
-                <div className="w-8 h-8 rounded bg-white shadow-sm flex items-center justify-center mr-3">
-                   <i className="fas fa-truck text-gray-400 group-hover:text-blue-600"></i>
-                </div>
+                <div className="w-8 h-8 rounded bg-white shadow-sm flex items-center justify-center mr-3"><i className="fas fa-truck text-gray-400 group-hover:text-blue-600"></i></div>
                 <span className="font-medium text-gray-700 group-hover:text-blue-600">Manage Movers</span>
              </a>
-             <button onClick={() => alert('Feature coming soon')} className="w-full flex items-center p-3 rounded-lg bg-gray-50 hover:bg-blue-50 hover:text-blue-600 transition-colors group">
-                <div className="w-8 h-8 rounded bg-white shadow-sm flex items-center justify-center mr-3">
-                   <i className="fas fa-cog text-gray-400 group-hover:text-blue-600"></i>
-                </div>
+             <a href="/admin/settings" className="flex items-center p-3 rounded-lg bg-gray-50 hover:bg-blue-50 hover:text-blue-600 transition-colors group">
+                <div className="w-8 h-8 rounded bg-white shadow-sm flex items-center justify-center mr-3"><i className="fas fa-cog text-gray-400 group-hover:text-blue-600"></i></div>
                 <span className="font-medium text-gray-700 group-hover:text-blue-600">Settings</span>
-             </button>
+             </a>
           </div>
         </div>
       </div>

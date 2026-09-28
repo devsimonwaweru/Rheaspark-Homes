@@ -1,6 +1,6 @@
 import { supabase } from './supabaseClient';
 
-/* ── Image helpers (images is a TEXT column — mirrors PropertyCard's parser) ── */
+/* ── Image helpers ── */
 export function parseImages(raw, fallbackUrl) {
   let sources = [];
   if (raw) {
@@ -20,7 +20,14 @@ export function parseImages(raw, fallbackUrl) {
   return sources.filter(Boolean);
 }
 
-export const firstImage = (p) => (p ? parseImages(p.images, p.image_url)[0] : null);
+// Updated to handle the new 'photos' array from airbnb_listings
+export const firstImage = (p) => {
+  if (!p) return null;
+  // Prioritize the new photos array if it exists
+  if (Array.isArray(p.photos) && p.photos.length > 0) return p.photos[0];
+  // Fallback to old parser for mixed/legacy data
+  return parseImages(p.images, p.image_url)[0] || null;
+};
 
 export const cloudImg = (url, width = 400) =>
   url ? `https://res.cloudinary.com/deqowfv7y/image/fetch/f_auto,q_auto,w_${width}/${url}` : url;
@@ -44,14 +51,13 @@ export const formatKsh = (n) => 'KES ' + Number(n || 0).toLocaleString();
 /* ── Property fetching ────────────────────────────────────────── */
 export async function fetchShortStayProperties(search = '') {
   let q = supabase
-    .from('properties')
+    .from('airbnb_listings') // CHANGED: Now queries the dedicated Airbnb table
     .select('*')
-    .in('listing_type', ['short_stay', 'both'])
-    .not('price_per_night', 'is', null)
-    .eq('status', 'active');
+    .eq('status', 'active'); // Removed listing_type filter since the whole table is Airbnb
 
   if (search) {
-    q = q.or(`location.ilike.%${search}%,town.ilike.%${search}%,county.ilike.%${search}%`);
+    // CHANGED: Search 'name' instead of 'town', matching the new schema
+    q = q.or(`location.ilike.%${search}%,county.ilike.%${search}%,name.ilike.%${search}%`);
   }
 
   const { data, error } = await q.order('created_at', { ascending: false });
@@ -60,6 +66,8 @@ export async function fetchShortStayProperties(search = '') {
 }
 
 /* ── Server-side quote (never trust frontend prices) ── */
+// NOTE: You will eventually need to update the underlying `quote_short_stay` SQL function 
+// in Supabase to query `airbnb_listings` instead of `properties` for the price.
 export async function quoteShortStay(propertyId, checkIn, nights) {
   const { data, error } = await supabase.rpc('quote_short_stay', {
     p_property_id: propertyId, p_check_in: checkIn, p_nights: nights,
@@ -71,6 +79,8 @@ export async function quoteShortStay(propertyId, checkIn, nights) {
 }
 
 /* ── Booking lifecycle ────────────────────────────────────────── */
+// NOTE: You will eventually need to update the underlying `create_short_stay_booking` SQL function 
+// in Supabase to validate against `airbnb_listings` instead of `properties`.
 export async function createShortStayBooking(payload) {
   const { data, error } = await supabase.rpc('create_short_stay_booking', {
     p_property_id: payload.propertyId, p_check_in: payload.checkIn, p_nights: payload.nights,
@@ -102,7 +112,8 @@ export async function getMyShortStayBookings() {
   if (!user) return [];
   const { data, error } = await supabase
     .from('short_stay_bookings')
-    .select('*, property:properties(id, title, location, images, image_url, county, town)')
+    // CHANGED: Join now points to airbnb_listings and uses 'name' instead of 'title', 'photos' instead of 'images'
+    .select('*, property:airbnb_listings(id, name, location, photos, image_url, county)')
     .eq('guest_id', user.id)
     .order('created_at', { ascending: false });
   if (error) throw new Error(error.message);
@@ -114,7 +125,8 @@ export async function getLandlordShortStayBookings() {
   if (!user) return [];
   const { data, error } = await supabase
     .from('short_stay_bookings')
-    .select('*, property:properties(id, title, location, images, image_url)')
+    // CHANGED: Join now points to airbnb_listings
+    .select('*, property:airbnb_listings(id, name, location, photos, image_url)')
     .eq('landlord_id', user.id)
     .order('created_at', { ascending: false });
   if (error) throw new Error(error.message);

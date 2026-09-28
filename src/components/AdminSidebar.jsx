@@ -22,8 +22,9 @@ const AdminSidebar = ({ closeSidebar }) => {
     { name: 'Users', path: '/admin/users', icon: 'fa-users' },
     { name: 'Landlords', path: '/admin/landlords', icon: 'fa-user-tie' },
     { name: 'Properties', path: '/admin/properties', icon: 'fa-home' },
+    { name: 'Airbnbs', path: '/admin/airbnbs', icon: 'fa-bed' }, // <-- ADDED AIRBNB LINK
     { name: 'Movers', path: '/admin/movers', icon: 'fa-truck' },
-    { name: 'Payments', path: '/admin/payments', icon: 'fa-credit-card' }, // <-- ADDED
+    { name: 'Payments', path: '/admin/payments', icon: 'fa-credit-card' },
   ];
 
   const bottomNavItems = [

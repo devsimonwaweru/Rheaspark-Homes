@@ -18,10 +18,8 @@ import ForgotPassword from "./pages/ForgotPassword";
 import UpdatePassword from "./pages/UpdatePassword";
 import UserDashboard from "./pages/UserDashboard";
 import SubscriptionPage from "./pages/SubscriptionPage";
-
-// ── SHORT-STAY ADDITION (1 of 2): new pages ──
-import ShortStays from "./pages/ShortStays";
-import MyShortStayBookings from "./pages/MyShortStayBookings";
+import FindAirbnb from "./pages/FindAirbnb";
+import MyAirbnbBookings from "./pages/MyAirbnbBookings";
 
 // Landlord Pages
 import LandlordDashboard from "./pages/LandlordDashboard";
@@ -31,6 +29,9 @@ import LandlordProperties from "./pages/LandlordProperties";
 import LandlordRequests from "./pages/LandlordRequests";
 import LandlordPayments from "./pages/LandlordPayments";
 import LandlordMaintenance from "./pages/LandlordMaintenance";
+
+// Airbnb Host Pages
+import HostDashboard from "./pages/HostDashboard";
 
 // Mover & Admin Pages
 import MoverDashboard from "./pages/MoverDashboard";
@@ -42,12 +43,16 @@ import AdminDashboard from "./pages/AdminDashboard";
 import AdminUsers from "./pages/AdminUsers";
 import AdminLandlords from "./pages/AdminLandlords";
 import AdminProperties from "./pages/AdminProperties";
+import AdminAirbnbs from "./pages/AdminAirbnbs"; // <-- ADDED IMPORT
 import AdminMovers from "./pages/AdminMovers";
 import AdminSettings from "./pages/AdminSettings";
 import AdminPayments from "./pages/AdminPayments";
-
-// NEW: Import JoinPage
 import JoinPage from "./pages/JoinPage";
+
+// TEMP PLACEHOLDERS for Host Sub-pages (Move to separate files later)
+const HostHome = () => <div className="p-8"><h1 className="text-2xl font-bold">Host Dashboard Home</h1><p className="text-gray-500 mt-2">Overview of your Airbnb performance.</p></div>;
+const HostListings = () => <div className="p-8"><h1 className="text-2xl font-bold">My Airbnb Listings</h1><p className="text-gray-500 mt-2">Manage your short-stay properties.</p></div>;
+const HostBookings = () => <div className="p-8"><h1 className="text-2xl font-bold">Booking Requests</h1><p className="text-gray-500 mt-2">View and manage incoming availability requests.</p></div>;
 
 // ---------------- PUBLIC LAYOUT ----------------
 const PublicLayout = ({ children }) => (
@@ -90,21 +95,12 @@ function App() {
   // --- PASSWORD RESET INTERCEPTOR ---
   if (typeof window !== "undefined") {
     const searchParams = new URLSearchParams(window.location.search);
-
     if (
       searchParams.has("access_token") &&
       searchParams.get("type") === "recovery"
     ) {
-      sessionStorage.setItem(
-        "reset_access_token",
-        searchParams.get("access_token")
-      );
-
-      sessionStorage.setItem(
-        "reset_refresh_token",
-        searchParams.get("refresh_token")
-      );
-
+      sessionStorage.setItem("reset_access_token", searchParams.get("access_token"));
+      sessionStorage.setItem("reset_refresh_token", searchParams.get("refresh_token"));
       window.location.replace("/#/update-password");
       return null;
     }
@@ -114,193 +110,63 @@ function App() {
     <Router>
       <Routes>
         {/* AUTH */}
-        <Route
-          path="/login"
-          element={
-            session ? (
-              <Navigate to="/" replace />
-            ) : (
-              <PublicLayout>
-                <Login />
-              </PublicLayout>
-            )
-          }
-        />
-
-        <Route
-          path="/register"
-          element={
-            session ? (
-              <Navigate to="/" replace />
-            ) : (
-              <PublicLayout>
-                <Register />
-              </PublicLayout>
-            )
-          }
-        />
-
-        <Route
-          path="/forgot-password"
-          element={
-            session ? (
-              <Navigate to="/" replace />
-            ) : (
-              <PublicLayout>
-                <ForgotPassword />
-              </PublicLayout>
-            )
-          }
-        />
-
+        <Route path="/login" element={session ? <Navigate to="/" replace /> : <PublicLayout><Login /></PublicLayout>} />
+        <Route path="/register" element={session ? <Navigate to="/" replace /> : <PublicLayout><Register /></PublicLayout>} />
+        <Route path="/forgot-password" element={session ? <Navigate to="/" replace /> : <PublicLayout><ForgotPassword /></PublicLayout>} />
         <Route path="/update-password" element={<UpdatePassword />} />
 
         {/* ADMIN */}
         <Route path="/admin/login" element={<AdminLogin />} />
-
-        <Route
-          path="/admin/*"
-          element={
-            session ? (
-              <AdminLayout />
-            ) : (
-              <Navigate to="/admin/login" replace />
-            )
-          }
-        >
+        <Route path="/admin/*" element={session ? <AdminLayout /> : <Navigate to="/admin/login" replace />}>
           <Route index element={<AdminDashboard />} />
           <Route path="users" element={<AdminUsers />} />
           <Route path="landlords" element={<AdminLandlords />} />
           <Route path="properties" element={<AdminProperties />} />
+          <Route path="airbnbs" element={<AdminAirbnbs />} /> {/* <-- ADDED ROUTE */}
           <Route path="movers" element={<AdminMovers />} />
           <Route path="payments" element={<AdminPayments />} />
           <Route path="settings" element={<AdminSettings />} />
         </Route>
 
         {/* USER */}
-        <Route
-          path="/user/dashboard"
-          element={
-            session ? (
-              <UserDashboard />
-            ) : (
-              <Navigate to="/login" replace />
-            )
-          }
-        />
-
-        {/* ── SHORT-STAY ADDITION (2 of 2): guest's own bookings, protected ── */}
-        <Route
-          path="/my-stay-bookings"
-          element={
-            session ? (
-              <MyShortStayBookings />
-            ) : (
-              <Navigate to="/login" replace />
-            )
-          }
-        />
-
-        <Route
-          path="/subscribe"
-          element={
-            session ? (
-              <SubscriptionPage />
-            ) : (
-              <Navigate to="/login" replace />
-            )
-          }
-        />
-
-        {/* NEW: PUBLIC JOIN LINK (No Header/Footer) */}
+        <Route path="/user/dashboard" element={session ? <UserDashboard /> : <Navigate to="/login" replace />} />
+        <Route path="/my-airbnb-bookings" element={session ? <MyAirbnbBookings /> : <Navigate to="/login" replace />} />
+        <Route path="/subscribe" element={session ? <SubscriptionPage /> : <Navigate to="/login" replace />} />
         <Route path="/join/:code" element={<JoinPage />} />
 
         {/* LANDLORD MANAGEMENT SUITE */}
-        <Route
-          path="/landlord/*"
-          element={
-            session ? (
-              <LandlordDashboard />
-            ) : (
-              <Navigate to="/login" replace />
-            )
-          }
-        >
+        <Route path="/landlord/*" element={session ? <LandlordDashboard /> : <Navigate to="/login" replace />}>
           <Route index element={<LandlordHome />} />
           <Route path="rentals" element={<LandlordRentals />} />
           <Route path="payments" element={<LandlordPayments />} />
           <Route path="maintenance" element={<LandlordMaintenance />} />
           <Route path="properties" element={<LandlordProperties />} />
           <Route path="requests" element={<LandlordRequests />} />
-          <Route
-            path="messages"
-            element={<LandlordHome status="coming_soon" />}
-          />
-          <Route
-            path="settings"
-            element={<LandlordHome status="coming_soon" />}
-          />
+          <Route path="messages" element={<LandlordHome status="coming_soon" />} />
+          <Route path="settings" element={<LandlordHome status="coming_soon" />} />
+        </Route>
+
+        {/* 🏨 AIRBNB HOST MANAGEMENT SUITE */}
+        <Route path="/host/*" element={session ? <HostDashboard /> : <Navigate to="/login" replace />}>
+          <Route index element={<HostHome />} />
+          <Route path="listings" element={<HostListings />} />
+          <Route path="bookings" element={<HostBookings />} />
         </Route>
 
         {/* MOVER */}
-        <Route
-          path="/mover/*"
-          element={
-            session ? (
-              <MoverDashboard />
-            ) : (
-              <Navigate to="/login" replace />
-            )
-          }
-        >
+        <Route path="/mover/*" element={session ? <MoverDashboard /> : <Navigate to="/login" replace />}>
           <Route index element={<MoverHome />} />
           <Route path="jobs" element={<MoverJobs />} />
         </Route>
 
         {/* TEMPORARY SANITY IMAGE MIGRATION */}
-        <Route
-          path="/sanity-migration"
-          element={<SanityMigrationUploader />}
-        />
+        <Route path="/sanity-migration" element={<SanityMigrationUploader />} />
 
         {/* PUBLIC */}
-        <Route
-          path="/"
-          element={
-            <PublicLayout>
-              <Home />
-            </PublicLayout>
-          }
-        />
-
-        <Route
-          path="/find-houses"
-          element={
-            <PublicLayout>
-              <FindHouses />
-            </PublicLayout>
-          }
-        />
-
-        {/* ── SHORT-STAY ADDITION: public marketplace page (Header/Footer) ── */}
-        <Route
-          path="/short-stays"
-          element={
-            <PublicLayout>
-              <ShortStays />
-            </PublicLayout>
-          }
-        />
-
-        <Route
-          path="/movers"
-          element={
-            <PublicLayout>
-              <MoversPage />
-            </PublicLayout>
-          }
-        />
-
+        <Route path="/" element={<PublicLayout><Home /></PublicLayout>} />
+        <Route path="/find-houses" element={<PublicLayout><FindHouses /></PublicLayout>} />
+        <Route path="/find-airbnb" element={<PublicLayout><FindAirbnb /></PublicLayout>} />
+        <Route path="/movers" element={<PublicLayout><MoversPage /></PublicLayout>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
