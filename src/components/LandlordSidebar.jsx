@@ -129,6 +129,17 @@ export default function LandlordSidebar({ onAddProperty }) {
               </Link>
             </div>
 
+            {/* --- SHORT STAYS / BNB MENU --- */}
+            <div className="mt-4 pt-4 border-t border-gray-100 space-y-1">
+              <span className="px-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Short Stays</span>
+              
+              {/* Changed link to="/host" and updated active state check to handle sub-routes */}
+              <Link to="/host" onClick={() => setIsOpen(false)} className={navItemClass(location.pathname.startsWith('/host'))}>
+                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+                 <span>Host Dashboard</span>
+              </Link>
+            </div>
+
           </nav>
           
           {/* Logout */}

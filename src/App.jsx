@@ -43,7 +43,7 @@ import AdminDashboard from "./pages/AdminDashboard";
 import AdminUsers from "./pages/AdminUsers";
 import AdminLandlords from "./pages/AdminLandlords";
 import AdminProperties from "./pages/AdminProperties";
-import AdminAirbnbs from "./pages/AdminAirbnbs"; // <-- ADDED IMPORT
+import AdminAirbnbs from "./pages/AdminAirbnbs";
 import AdminMovers from "./pages/AdminMovers";
 import AdminSettings from "./pages/AdminSettings";
 import AdminPayments from "./pages/AdminPayments";
@@ -122,7 +122,7 @@ function App() {
           <Route path="users" element={<AdminUsers />} />
           <Route path="landlords" element={<AdminLandlords />} />
           <Route path="properties" element={<AdminProperties />} />
-          <Route path="airbnbs" element={<AdminAirbnbs />} /> {/* <-- ADDED ROUTE */}
+          <Route path="airbnbs" element={<AdminAirbnbs />} />
           <Route path="movers" element={<AdminMovers />} />
           <Route path="payments" element={<AdminPayments />} />
           <Route path="settings" element={<AdminSettings />} />
@@ -142,11 +142,12 @@ function App() {
           <Route path="maintenance" element={<LandlordMaintenance />} />
           <Route path="properties" element={<LandlordProperties />} />
           <Route path="requests" element={<LandlordRequests />} />
+          <Route path="host-dashboard" element={<HostDashboard />} /> {/* <-- ADDED MISSING ROUTE HERE */}
           <Route path="messages" element={<LandlordHome status="coming_soon" />} />
           <Route path="settings" element={<LandlordHome status="coming_soon" />} />
         </Route>
 
-        {/* 🏨 AIRBNB HOST MANAGEMENT SUITE */}
+        {/* 🏨 AIRBNB HOST MANAGEMENT SUITE (Standalone Route) */}
         <Route path="/host/*" element={session ? <HostDashboard /> : <Navigate to="/login" replace />}>
           <Route index element={<HostHome />} />
           <Route path="listings" element={<HostListings />} />

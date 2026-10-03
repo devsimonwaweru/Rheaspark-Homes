@@ -1,3 +1,4 @@
+// src/pages/LandlordDashboard.jsx
 import React, { useState, useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
