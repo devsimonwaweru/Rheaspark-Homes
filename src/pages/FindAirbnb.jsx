@@ -57,7 +57,11 @@ export default function FindAirbnb() {
   const fetchAirbnbs = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.from("airbnb_listings").select("*").eq('status', 'active').order('created_at', { ascending: false });
+      const { data, error } = await supabase
+        .from("airbnb_listings")
+        .select("*, host:airbnb_hosts(phone)")
+        .eq('status', 'active')
+        .order('created_at', { ascending: false });
       if (error) throw error;
       setProperties(data || []);
     } catch (error) {
