@@ -6,7 +6,7 @@ import AirbnbCard from "../components/AirbnbCard";
 
 const getDistance = (lat1, lon1, lat2, lon2) => {
   if (!lat1 || !lon1 || !lat2 || !lon2) return Infinity;
-  const R = 6371; 
+  const R = 6371;
   const dLat = (lat2 - lat1) * Math.PI / 180;
   const dLon = (lon2 - lon1) * Math.PI / 180;
   const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
@@ -43,7 +43,11 @@ export default function FindAirbnb() {
       const { data: { session: currentSession } } = await supabase.auth.getSession();
       setSession(currentSession);
       if (currentSession) {
-        const { data: profile } = await supabase.from('airbnb_hosts').select('subscription_status').eq('id', currentSession.user.id).maybeSingle();
+        const { data: profile } = await supabase
+          .from('airbnb_hosts')
+          .select('subscription_status')
+          .eq('id', currentSession.user.id)
+          .maybeSingle();
         if (profile?.subscription_status === 'active') setAuthStatus('host');
         else if (profile) setAuthStatus('user');
         else setAuthStatus('guest');
@@ -57,13 +61,43 @@ export default function FindAirbnb() {
   const fetchAirbnbs = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      // 1. Fetch all active listings
+      const { data: listings, error: listingsError } = await supabase
         .from("airbnb_listings")
-        .select("*, host:airbnb_hosts(phone)")
+        .select("*")
         .eq('status', 'active')
         .order('created_at', { ascending: false });
-      if (error) throw error;
-      setProperties(data || []);
+
+      if (listingsError) throw listingsError;
+
+      // 2. Fetch host phones separately (no direct FK between the two tables,
+      //    both reference auth.users — so we can't use a nested .select() join)
+      const hostIds = [...new Set(
+        (listings || []).map(l => l.host_id).filter(Boolean)
+      )];
+
+      let hostsMap = {};
+      if (hostIds.length > 0) {
+        const { data: hosts, error: hostsError } = await supabase
+          .from('airbnb_hosts')
+          .select('id, phone')
+          .in('id', hostIds);
+
+        if (!hostsError && hosts) {
+          hostsMap = hosts.reduce((acc, h) => {
+            acc[h.id] = h;
+            return acc;
+          }, {});
+        }
+      }
+
+      // 3. Merge host phone into each listing so AirbnbCard can read airbnb.host.phone
+      const mergedListings = (listings || []).map(l => ({
+        ...l,
+        host: hostsMap[l.host_id] || null
+      }));
+
+      setProperties(mergedListings);
     } catch (error) {
       console.error("Error fetching airbnbs:", error.message);
     } finally {

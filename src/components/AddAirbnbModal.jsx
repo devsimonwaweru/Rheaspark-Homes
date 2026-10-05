@@ -15,12 +15,12 @@ export default function AddAirbnbModal({ isOpen, onClose, onSuccess }) {
     name: '', location: '', county: '', constituency: '',
     description: '', house_rules: '',
     max_guests: 1, bedrooms: 1, beds: 1, bathrooms: 1,
-    amenities: '', // Comma separated for simple input
+    amenities: '',
     price_per_night: '', cleaning_fee: 0, min_nights: 1,
-    check_in_time: '2:00 PM', check_out_time: '10:00 AM'
+    check_in_time: '2:00 PM', check_out_time: '10:00 AM',
+    contact_whatsapp: '', contact_phone: ''
   });
 
-  // Cleanup blob URLs on unmount
   useEffect(() => {
     return () => {
       imageFiles.forEach(img => {
@@ -87,6 +87,10 @@ export default function AddAirbnbModal({ isOpen, onClose, onSuccess }) {
       return alert("Please upload at least one image");
     }
 
+    if (!form.contact_whatsapp) {
+      return alert("Please enter your WhatsApp number so guests can book.");
+    }
+
     setSaving(true);
     setError(null);
 
@@ -101,7 +105,11 @@ export default function AddAirbnbModal({ isOpen, onClose, onSuccess }) {
       // 2. Format arrays from comma-separated strings
       const amenitiesArray = form.amenities ? form.amenities.split(',').map(item => item.trim()).filter(Boolean) : [];
 
-      // 3. Prepare Database Payload
+      // 3. Clean phone numbers (digits only)
+      const cleanWhatsapp = form.contact_whatsapp.replace(/\D/g, '');
+      const cleanPhone = form.contact_phone ? form.contact_phone.replace(/\D/g, '') : '';
+
+      // 4. Prepare Database Payload
       const payload = {
         host_id: user.id,
         name: form.name,
@@ -120,12 +128,16 @@ export default function AddAirbnbModal({ isOpen, onClose, onSuccess }) {
         min_nights: parseInt(form.min_nights) || 1,
         check_in_time: form.check_in_time,
         check_out_time: form.check_out_time,
-        image_url: imageUrls[0] || '', // Main cover image
-        photos: imageUrls, // Array of all image URLs
-        status: 'active' 
+        image_url: imageUrls[0] || '',
+        photos: imageUrls,
+        status: 'active',
+        contact_info: {
+          whatsapp: cleanWhatsapp,
+          phone: cleanPhone || cleanWhatsapp
+        }
       };
 
-      // 4. Insert into Supabase
+      // 5. Insert into Supabase
       const { error: insertError } = await supabase.from('airbnb_listings').insert(payload);
       if (insertError) throw insertError;
 
@@ -165,6 +177,51 @@ export default function AddAirbnbModal({ isOpen, onClose, onSuccess }) {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">County</label>
                 <input type="text" name="county" value={form.county} onChange={handleChange} className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Constituency</label>
+                <input type="text" name="constituency" value={form.constituency} onChange={handleChange} className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none" />
+              </div>
+            </div>
+          </div>
+
+          {/* Contact Information */}
+          <div className="space-y-4">
+            <h3 className="font-semibold text-gray-700 border-b pb-2 flex items-center gap-2">
+              <svg className="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.149-.197.297-.767.967-.94 1.164-.173.199-.347.223-.644.075-.297-.149-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347"/>
+              </svg>
+              Contact Information
+            </h3>
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-2">
+              <p className="text-xs text-green-700">
+                Guests will use the <strong>Book Now</strong> button to contact you directly on WhatsApp. 
+                Enter your number in international format without <code>+</code> (e.g. <code>254712345678</code>).
+              </p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">WhatsApp Number*</label>
+                <input 
+                  type="tel" 
+                  name="contact_whatsapp" 
+                  value={form.contact_whatsapp} 
+                  onChange={handleChange} 
+                  required 
+                  className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-green-500 outline-none" 
+                  placeholder="254712345678" 
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Alt Phone (optional)</label>
+                <input 
+                  type="tel" 
+                  name="contact_phone" 
+                  value={form.contact_phone} 
+                  onChange={handleChange} 
+                  className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-green-500 outline-none" 
+                  placeholder="254712345678" 
+                />
               </div>
             </div>
           </div>
@@ -225,7 +282,7 @@ export default function AddAirbnbModal({ isOpen, onClose, onSuccess }) {
             </div>
           </div>
 
-          {/* Media & Details (Matching AddPropertyModal) */}
+          {/* Media & Details */}
           <div className="space-y-4">
             <h3 className="font-semibold text-gray-700 border-b pb-2">Media & Details</h3>
             
