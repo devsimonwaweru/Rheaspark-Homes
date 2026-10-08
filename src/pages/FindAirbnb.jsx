@@ -25,6 +25,7 @@ export default function FindAirbnb() {
   const [locationStatus, setLocationStatus] = useState('idle');
   const [dismissedHouseHint, setDismissedHouseHint] = useState(false);
   const [favorites, setFavorites] = useState(new Set());
+  const [feeSettings, setFeeSettings] = useState(null);
 
   const [filters, setFilters] = useState({
     searchQuery: "", minPrice: "", maxPrice: "", type: "All",
@@ -39,9 +40,11 @@ export default function FindAirbnb() {
 
   useEffect(() => {
     const initializeData = async () => {
-      await fetchAirbnbs();
+      await Promise.all([fetchAirbnbs(), fetchFeeSettings()]);
+
       const { data: { session: currentSession } } = await supabase.auth.getSession();
       setSession(currentSession);
+
       if (currentSession) {
         const { data: profile } = await supabase
           .from('airbnb_hosts')
@@ -61,47 +64,35 @@ export default function FindAirbnb() {
   const fetchAirbnbs = async () => {
     setLoading(true);
     try {
-      // 1. Fetch all active listings
-      const { data: listings, error: listingsError } = await supabase
+      const { data, error } = await supabase
         .from("airbnb_listings")
         .select("*")
         .eq('status', 'active')
         .order('created_at', { ascending: false });
 
-      if (listingsError) throw listingsError;
-
-      // 2. Fetch host phones separately (no direct FK between the two tables,
-      //    both reference auth.users — so we can't use a nested .select() join)
-      const hostIds = [...new Set(
-        (listings || []).map(l => l.host_id).filter(Boolean)
-      )];
-
-      let hostsMap = {};
-      if (hostIds.length > 0) {
-        const { data: hosts, error: hostsError } = await supabase
-          .from('airbnb_hosts')
-          .select('id, phone')
-          .in('id', hostIds);
-
-        if (!hostsError && hosts) {
-          hostsMap = hosts.reduce((acc, h) => {
-            acc[h.id] = h;
-            return acc;
-          }, {});
-        }
-      }
-
-      // 3. Merge host phone into each listing so AirbnbCard can read airbnb.host.phone
-      const mergedListings = (listings || []).map(l => ({
-        ...l,
-        host: hostsMap[l.host_id] || null
-      }));
-
-      setProperties(mergedListings);
+      if (error) throw error;
+      setProperties(data || []);
     } catch (error) {
       console.error("Error fetching airbnbs:", error.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchFeeSettings = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('short_stay_settings')
+        .select('fee_type, fee_value')
+        .eq('id', 1)
+        .maybeSingle();
+
+      if (error) throw error;
+      // Use whatever admin configured, or null if not configured
+      setFeeSettings(data || null);
+    } catch (error) {
+      console.error("Error fetching fee settings:", error.message);
+      setFeeSettings(null);
     }
   };
 
@@ -228,7 +219,14 @@ export default function FindAirbnb() {
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8">
             {sortedProperties.map((property) => (
-              <AirbnbCard key={property.id} airbnb={property} onViewDetails={() => {}} isFavorite={favorites.has(property.id)} onToggleFavorite={handleToggleFavorite} />
+              <AirbnbCard
+                key={property.id}
+                airbnb={property}
+                onViewDetails={() => {}}
+                isFavorite={favorites.has(property.id)}
+                onToggleFavorite={handleToggleFavorite}
+                feeSettings={feeSettings}
+              />
             ))}
           </div>
         )}
